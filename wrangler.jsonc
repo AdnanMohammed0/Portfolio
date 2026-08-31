@@ -18,7 +18,12 @@
      * `/work/:slug` and `/admin/*` are client-side routes with no matching
      * file on disk. Serving index.html for unmatched paths lets React Router
      * resolve them, instead of returning 404 on refresh or a direct link.
-     * This is the Workers equivalent of the `_redirects` file.
+     *
+     * Do NOT also ship a `_redirects` file containing `/* /index.html 200`.
+     * Workers reads `_redirects` too, and rejects that rule as an infinite
+     * loop because this setting already covers the same case:
+     *   "Line 1: Infinite loop detected in this rule" [code: 100324]
+     * That file is only needed on Netlify and Cloudflare Pages.
      */
     "not_found_handling": "single-page-application"
   },

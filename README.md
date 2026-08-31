@@ -167,7 +167,7 @@ npm run lint
 | --- | --- |
 | Build command | `npm run build` |
 | Output directory | `dist` |
-| Deploy command | leave empty on Pages/Vercel/Netlify. Cloudflare **Workers Builds**: `npx wrangler deploy` |
+| Deploy command | leave empty on Pages/Vercel/Netlify. Cloudflare **Workers Builds**: `npx wrangler deploy --keep-vars` |
 | Install command | `npm ci` (or leave the default) |
 | Node version | 20 or newer |
 
@@ -189,8 +189,23 @@ this, those URLs 404 on refresh or when opened directly.
 | Host | Handled by |
 | --- | --- |
 | Cloudflare Workers | `wrangler.jsonc` → `assets.not_found_handling` |
-| Cloudflare Pages, Netlify | `public/_redirects` |
 | Vercel | `vercel.json` |
+| Cloudflare Pages, Netlify | needs a `public/_redirects` file — see below |
+
+**Do not add `public/_redirects` while deploying to Workers.** Workers reads
+that file as well and rejects the SPA rule, because `not_found_handling`
+already covers it:
+
+```
+Invalid _redirects configuration:
+Line 1: Infinite loop detected in this rule. [code: 100324]
+```
+
+If you move to Netlify or Cloudflare Pages, create it then:
+
+```
+/*    /index.html   200
+```
 
 ### Cloudflare Workers
 
@@ -202,6 +217,12 @@ requires Vite 6+ and otherwise fails the build with:
 The version of Vite used in the project ("5.4.21") cannot be automatically
 configured. Please update the Vite version to at least "6.0.0".
 ```
+
+`--keep-vars` matters: without it `wrangler deploy` overwrites the Worker's
+remote configuration with the local file, which deletes every environment
+variable set in the dashboard. The build itself still succeeds — Vite bakes
+`VITE_*` values in at build time — so the loss is silent until something later
+needs them.
 
 Validate a deploy without shipping it:
 
