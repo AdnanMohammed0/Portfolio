@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUpRight } from 'lucide-react';
 import { Container } from '@/components/primitives';
 import { InteractiveHand } from '@/components/hand/InteractiveHand';
 import { useSiteContent } from '@/hooks/usePortfolio';
-import { useIsCompact } from '@/hooks/useMediaQuery';
+import { useIsCompact, useIsTouchDevice } from '@/hooks/useMediaQuery';
 
 /**
  * The hero. The interactive hand lives inside it — never as its own section.
@@ -16,6 +16,8 @@ export function Hero() {
   const heroRef = useRef<HTMLElement>(null);
   const { hero } = useSiteContent();
   const compact = useIsCompact();
+  // AR is offered on touch hardware, which is not the same thing as a narrow window.
+  const touch = useIsTouchDevice();
 
   const jump = (href: string) => {
     if (href.startsWith('#')) {
@@ -80,8 +82,8 @@ export function Hero() {
           <div className="order-2 lg:col-span-6 xl:col-span-6">
             <InteractiveHand
               trackingTargetRef={heroRef}
-              showArButton={compact}
-              autoStartAr={compact}
+              showArButton={touch}
+              autoStartAr={touch}
               className={
                 compact
                   ? 'relative mx-auto block h-[48vh] max-h-[440px] w-full max-w-sm pb-16'

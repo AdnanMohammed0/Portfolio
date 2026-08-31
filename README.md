@@ -123,6 +123,26 @@ through it, so they can never disagree about what the content is.
 
 ---
 
+## Testing on a phone
+
+`npm run dev` binds to the local network, so the site is reachable at
+`http://<your-ip>:5183`. That is enough for everything except AR.
+
+AR calls `getUserMedia`, which browsers only allow in a **secure context**:
+
+| How you open it | AR works? |
+| --- | --- |
+| `http://localhost:5183` | Yes — localhost is always treated as secure |
+| `http://192.168.x.x:5183` | No — plain HTTP on a LAN address is not secure |
+| `npm run dev:https` → `https://192.168.x.x:5183` | Android Chrome yes, after accepting the certificate warning. **iOS Safari no** — it refuses the camera behind an untrusted certificate |
+| `npm run tunnel` → `https://….loca.lt` | Yes, everywhere — the certificate is genuine |
+
+So for iPhone testing, run `npm run dev` in one terminal and `npm run tunnel`
+in another, and open the tunnel URL.
+
+When AR cannot start, the hero says why rather than failing silently, and the
+normal 3D hand keeps running either way.
+
 ## Scripts
 
 ```bash

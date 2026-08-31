@@ -23,3 +23,13 @@ export function useMediaQuery(query: string): boolean {
 export function useIsCompact(): boolean {
   return useMediaQuery('(max-width: 1023px)');
 }
+
+/**
+ * A touch device with no mouse. Used to decide whether AR is offered at all —
+ * viewport width alone gets this wrong in both directions: a tablet is wider
+ * than the `lg` breakpoint but still wants AR, and a narrow desktop window is
+ * narrower than it but does not.
+ */
+export function useIsTouchDevice(): boolean {
+  return useMediaQuery('(hover: none) and (pointer: coarse)');
+}

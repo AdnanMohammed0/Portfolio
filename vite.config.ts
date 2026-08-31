@@ -4,16 +4,21 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import path from 'node:path';
 
 /**
- * `npm run dev` serves over HTTPS on the local network.
+ * Dev server transport.
  *
- * The AR hand tracking calls getUserMedia, which browsers only allow in a
- * secure context. `localhost` counts as secure, but a LAN address does not —
- * so testing on a phone over http://192.168.x.x would silently break the
- * camera. A self-signed certificate keeps that path working; the phone shows a
- * one-time "not private" warning that you accept to continue.
+ * AR calls getUserMedia, which browsers only allow in a secure context.
+ * `localhost` qualifies; a plain-HTTP LAN address does not.
+ *
+ * `npm run dev:https` adds a self-signed certificate, which is enough for
+ * Android Chrome after you accept the warning. iOS Safari refuses the camera
+ * behind an untrusted certificate no matter what, so for iPhone testing use
+ * `npm run tunnel`, which publishes this server on a URL with a real
+ * certificate.
  */
+const useHttps = process.env.VITE_DEV_HTTPS === '1';
+
 export default defineConfig({
-  plugins: [react(), basicSsl()],
+  plugins: [react(), ...(useHttps ? [basicSsl()] : [])],
   server: {
     // Bind to every interface so the dev server is reachable from a phone.
     host: true,

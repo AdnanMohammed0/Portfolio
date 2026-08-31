@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:https": "node scripts/dev-https.mjs",
+    "tunnel": "node scripts/tunnel.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit"

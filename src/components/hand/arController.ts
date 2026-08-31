@@ -80,29 +80,53 @@ export class ARHandController {
     this.running = true;
     this.setStatus('starting');
 
+    /**
+     * Browsers only expose the camera in a secure context. `localhost` counts;
+     * a plain-HTTP LAN address does not, and neither does an HTTPS origin whose
+     * certificate the device does not trust — iOS Safari in particular refuses
+     * getUserMedia behind a self-signed certificate even after you tap through
+     * the warning. Saying so beats a generic "unavailable".
+     */
+    if (!window.isSecureContext) {
+      this.running = false;
+      this.setStatus(
+        'unavailable',
+        'AR needs a secure connection. Open this page over HTTPS with a trusted certificate.',
+      );
+      return;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       this.running = false;
-      this.setStatus('unavailable', 'AR interaction is unavailable on this device.');
+      this.setStatus(
+        'unavailable',
+        'This browser does not expose a camera API. AR interaction is unavailable.',
+      );
       return;
     }
 
     try {
-      // 1. Camera permission — only ever reached from an explicit user action.
+      // 1. Camera permission.
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       });
     } catch (error) {
       this.running = false;
-      const denied =
-        error instanceof DOMException &&
-        (error.name === 'NotAllowedError' || error.name === 'SecurityError');
-      this.setStatus(
-        denied ? 'denied' : 'unavailable',
-        denied
-          ? 'Camera access was denied. AR interaction is unavailable.'
-          : 'AR interaction is unavailable on this device.',
-      );
+      const name = error instanceof DOMException ? error.name : '';
+
+      const message =
+        name === 'NotAllowedError'
+          ? 'Camera access was denied. Allow it in your browser settings to use AR.'
+          : name === 'SecurityError'
+            ? 'The browser blocked the camera on this connection. A trusted HTTPS certificate is required.'
+            : name === 'NotFoundError' || name === 'OverconstrainedError'
+              ? 'No usable camera was found on this device.'
+              : name === 'NotReadableError'
+                ? 'The camera is already in use by another app.'
+                : `Camera could not be started${name ? ` (${name})` : ''}.`;
+
+      this.setStatus(name === 'NotAllowedError' ? 'denied' : 'unavailable', message);
       return;
     }
 
@@ -118,20 +142,38 @@ export class ARHandController {
       // 3. Hand tracking — imported only now, never in the main bundle.
       const vision = await import('@mediapipe/tasks-vision');
       const fileset = await vision.FilesetResolver.forVisionTasks(WASM_BASE);
-      const landmarker = await vision.HandLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numHands: 1,
-        minHandDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
+
+      /**
+       * The GPU delegate is much faster but fails outright on a good number of
+       * mobile GPUs and inside some in-app browsers. Fall back to CPU rather
+       * than reporting the whole feature as unavailable.
+       */
+      const createLandmarker = (delegate: 'GPU' | 'CPU') =>
+        vision.HandLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: MODEL_URL, delegate },
+          runningMode: 'VIDEO',
+          numHands: 1,
+          minHandDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+
+      let landmarker;
+      try {
+        landmarker = await createLandmarker('GPU');
+      } catch {
+        landmarker = await createLandmarker('CPU');
+      }
       this.landmarker = landmarker as unknown as ARHandController['landmarker'];
 
       this.setStatus('searching');
       this.loop();
-    } catch {
+    } catch (error) {
       await this.stop();
-      this.setStatus('unavailable', 'AR interaction is unavailable on this device.');
+      const detail = error instanceof Error ? error.message : '';
+      this.setStatus(
+        'unavailable',
+        `Hand tracking failed to load${detail ? `: ${detail.slice(0, 80)}` : '.'}`,
+      );
     }
   }
 
