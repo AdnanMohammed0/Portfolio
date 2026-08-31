@@ -161,13 +161,28 @@ npm run lint
 
 ## Deploying
 
-`npm run build` emits a static bundle in `dist/`. Any static host works
-(Vercel, Netlify, Cloudflare Pages).
+`npm run build` emits a static bundle in `dist/`. Any static host works.
 
-Two things to configure:
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+| Deploy command | leave empty (Cloudflare **Workers** only: `npx wrangler deploy`) |
+| Install command | `npm ci` (or leave the default) |
+| Node version | 20 or newer |
 
-- **SPA rewrites** — `/work/:slug` and `/admin/*` are client routes, so all
-  paths must fall back to `index.html`.
-- **Environment variables** — set `VITE_SUPABASE_URL` and
-  `VITE_SUPABASE_ANON_KEY` in the host's dashboard. Only ever the anon key; the
-  service role key must never reach the browser.
+**Environment variables** — set these in the host's dashboard, or the deployed
+site silently falls back to the in-browser demo store:
+
+```
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon / publishable key>
+```
+
+Only ever the anon key. The service-role key must never reach the browser — it
+bypasses row-level security entirely.
+
+**SPA rewrites** are already configured: `/work/:slug` and `/admin/*` are
+client-side routes, so every path has to fall back to `index.html`.
+`public/_redirects` covers Netlify and Cloudflare Pages, `vercel.json` covers
+Vercel. Without them those URLs 404 on refresh.
