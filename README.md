@@ -167,7 +167,7 @@ npm run lint
 | --- | --- |
 | Build command | `npm run build` |
 | Output directory | `dist` |
-| Deploy command | leave empty (Cloudflare **Workers** only: `npx wrangler deploy`) |
+| Deploy command | leave empty on Pages/Vercel/Netlify. Cloudflare **Workers Builds**: `npx wrangler deploy` |
 | Install command | `npm ci` (or leave the default) |
 | Node version | 20 or newer |
 
@@ -183,6 +183,28 @@ Only ever the anon key. The service-role key must never reach the browser — it
 bypasses row-level security entirely.
 
 **SPA rewrites** are already configured: `/work/:slug` and `/admin/*` are
-client-side routes, so every path has to fall back to `index.html`.
-`public/_redirects` covers Netlify and Cloudflare Pages, `vercel.json` covers
-Vercel. Without them those URLs 404 on refresh.
+client-side routes, so every path has to fall back to `index.html`. Without
+this, those URLs 404 on refresh or when opened directly.
+
+| Host | Handled by |
+| --- | --- |
+| Cloudflare Workers | `wrangler.jsonc` → `assets.not_found_handling` |
+| Cloudflare Pages, Netlify | `public/_redirects` |
+| Vercel | `vercel.json` |
+
+### Cloudflare Workers
+
+`wrangler.jsonc` declares a static site with no Worker script. Its presence
+also stops `wrangler deploy` from running framework auto-detection, which
+requires Vite 6+ and otherwise fails the build with:
+
+```
+The version of Vite used in the project ("5.4.21") cannot be automatically
+configured. Please update the Vite version to at least "6.0.0".
+```
+
+Validate a deploy without shipping it:
+
+```bash
+npx wrangler deploy --dry-run
+```

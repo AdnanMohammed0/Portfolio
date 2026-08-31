@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "adnan-mohammed",
+  "compatibility_date": "2026-08-28",
+
+  /**
+   * A static site: no Worker script, so there is no `main` entry point — the
+   * built bundle is served straight from Cloudflare's asset store.
+   *
+   * Having this file present is also what stops `wrangler deploy` from running
+   * its framework auto-detection, which insists on Vite 6+ and fails the build
+   * otherwise.
+   */
+  "assets": {
+    "directory": "./dist",
+
+    /**
+     * `/work/:slug` and `/admin/*` are client-side routes with no matching
+     * file on disk. Serving index.html for unmatched paths lets React Router
+     * resolve them, instead of returning 404 on refresh or a direct link.
+     * This is the Workers equivalent of the `_redirects` file.
+     */
+    "not_found_handling": "single-page-application"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
