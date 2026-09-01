@@ -91,11 +91,11 @@ export function WorksSection() {
 
         <div className="mt-12 sm:mt-16">
           {loading ? (
-            <div className="grid auto-rows-[15rem] gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <Skeleton className="sm:row-span-2" />
-              <Skeleton className="sm:col-span-2" />
-              <Skeleton />
-              <Skeleton />
+            <div className="grid gap-3 sm:auto-rows-[15rem] sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="min-h-[20rem] sm:row-span-2 sm:min-h-0" />
+              <Skeleton className="min-h-[16rem] sm:col-span-2 sm:min-h-0" />
+              <Skeleton className="min-h-[16rem] sm:min-h-0" />
+              <Skeleton className="min-h-[16rem] sm:min-h-0" />
             </div>
           ) : projects.length === 0 ? (
             <EmptyState
@@ -108,7 +108,7 @@ export function WorksSection() {
               }
             />
           ) : (
-            <div className="grid auto-rows-[15rem] gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:auto-rows-[15rem] sm:grid-cols-2 lg:grid-cols-3">
               {projects.map((project, index) => (
                 <ProjectCard
                   key={project.id}

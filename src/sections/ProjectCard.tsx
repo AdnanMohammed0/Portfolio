@@ -19,10 +19,15 @@ interface Props {
   index: number;
 }
 
+/**
+ * Heights are set per tile; the grid only fixes row height from `sm` up, where
+ * there are columns to span. On a one-column phone layout a fixed row height
+ * clipped the taller tiles into the one below.
+ */
 const SPAN: Record<TileSize, string> = {
-  tall: 'sm:row-span-2 min-h-[22rem] sm:min-h-[30rem]',
-  wide: 'sm:col-span-2 min-h-[15rem]',
-  standard: 'min-h-[15rem]',
+  tall: 'min-h-[20rem] sm:row-span-2 sm:min-h-[30rem]',
+  wide: 'min-h-[16rem] sm:col-span-2 sm:min-h-[15rem]',
+  standard: 'min-h-[16rem] sm:min-h-[15rem]',
 };
 
 /** Small ornamental caption used on every tile, as in the reference layout. */
@@ -121,10 +126,18 @@ export function ProjectCard({ project, size, index }: Props) {
             />
           )}
 
-          {/* Legibility scrim */}
+          {/* Legibility scrim.
+              Weighted to the bottom, where the title and description sit, and
+              kept nearly clear across the middle so the cover image still
+              reads. An evenly translucent overlay left text sitting on top of
+              picture detail and neither survived. */}
           <div
             aria-hidden="true"
-            className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/45"
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(to top, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.78) 28%, rgba(0,0,0,0.28) 58%, rgba(0,0,0,0.12) 78%, rgba(0,0,0,0.5) 100%)',
+            }}
           />
 
           {/* Top caption */}
@@ -137,7 +150,7 @@ export function ProjectCard({ project, size, index }: Props) {
             <div className="min-w-0">
               <h3
                 className={cx(
-                  'truncate tracking-tight text-white/90 transition-colors duration-500 group-hover:text-white',
+                  'text-balance tracking-tight text-white transition-colors duration-500',
                   size === 'tall' ? 'text-2xl sm:text-[1.75rem]' : 'text-xl',
                 )}
               >
@@ -150,7 +163,7 @@ export function ProjectCard({ project, size, index }: Props) {
               </p>
 
               {size !== 'standard' && (
-                <p className="mt-3 max-w-md text-sm leading-relaxed text-white/50">
+                <p className="mt-3 line-clamp-2 max-w-md text-sm leading-relaxed text-white/60 sm:line-clamp-3">
                   {project.short_description}
                 </p>
               )}
