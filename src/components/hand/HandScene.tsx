@@ -19,10 +19,26 @@ interface SceneProps {
   onPhaseChange?: (phase: string) => void;
 }
 
+/**
+ * Dev affordance: `?scrub=1.2` freezes the hand at that many seconds into the
+ * greeting. The controller is stepped forward deterministically with a fixed
+ * timestep, so the same value always produces the same pose — which makes the
+ * animation inspectable frame by frame instead of only watchable in real time.
+ */
+function readScrub(): number | null {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('scrub');
+  if (raw === null) return null;
+  const value = Number(raw);
+  return Number.isNaN(value) ? null : value;
+}
+
 function HandRig({ controller, pointerRef, reducedMotion, onPhaseChange }: SceneProps) {
   const poseRef = useRef<HandPose>(controller.pose);
   const lastPhase = useRef(controller.phase);
   const { invalidate } = useThree();
+  const scrub = useMemo(readScrub, []);
+  const scrubbed = useRef(false);
 
   /**
    * Brushed-metal skin: light enough to read on black, technical rather than
@@ -45,6 +61,32 @@ function HandRig({ controller, pointerRef, reducedMotion, onPhaseChange }: Scene
   useEffect(() => () => material.dispose(), [material]);
 
   useFrame((_state, delta) => {
+    if (scrub !== null) {
+      // Step to the requested moment once, then hold that pose.
+      if (!scrubbed.current) {
+        scrubbed.current = true;
+        const step = 1 / 120;
+        for (let elapsed = 0; elapsed < scrub; elapsed += step) {
+          controller.update(step, pointerRef.current);
+        }
+      }
+      material.opacity = controller.pose.opacity;
+      material.transparent = controller.pose.opacity < 0.999;
+      if (import.meta.env.DEV) {
+        (window as unknown as { __hand?: unknown }).__hand = {
+          phase: controller.phase,
+          opacity: controller.pose.opacity,
+          scale: controller.pose.scale,
+          curl: { ...controller.pose.curl },
+          wrist: { ...controller.pose.wrist },
+          pos: controller.pose.position.toArray(),
+          rot: controller.pose.rotation.toArray().slice(0, 3),
+        };
+      }
+      invalidate();
+      return;
+    }
+
     controller.update(delta, pointerRef.current);
     material.opacity = controller.pose.opacity;
     material.transparent = controller.pose.opacity < 0.999;
