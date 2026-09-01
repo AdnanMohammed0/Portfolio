@@ -157,9 +157,9 @@ function GltfHand({ poseRef }: Props) {
     // Fingers. Same CurlMap the procedural hand uses, so the greeting wave,
     // pointer idle and AR tracking all articulate the model.
     if (curlOverride !== null) {
-      rig?.apply(makeCurlMap(curlOverride), 1, pose.wrist);
+      rig?.apply(makeCurlMap(curlOverride), 1);
     } else {
-      rig?.apply(pose.curl, pose.spread, pose.wrist);
+      rig?.apply(pose.curl, pose.spread);
     }
 
     // Drive opacity on the model's own materials for the fade-in.

@@ -35,17 +35,6 @@ const FINGER_PARTS: Record<Exclude<FingerName, 'thumb'>, string[]> = {
 /** The thumb has one fewer joint and hinges across the palm. */
 const THUMB_PARTS = ['Cylinder.004', 'Cube.018', 'Cylinder.005', 'Cube.019'];
 
-/**
- * Parts that belong to the hand rather than the arm, and so travel with the
- * wrist: the palm shell, the thumb's metacarpal, and the wrist ball itself.
- * Everything else under `Root` — `Cube.014`, `Cylinder`, `Cylinder.001`,
- * `Cylinder.018`, `Cylinder.002` — is forearm and stays where it is.
- */
-const HAND_PARTS = ['Cube.025', 'Cube.017', 'Sphere.008'];
-
-/** The wrist ball: its centre is the pivot the whole hand rotates about. */
-const WRIST_PART = 'Sphere.008';
-
 /** Later joints close further than the knuckle, as in a real finger. */
 const JOINT_WEIGHTS = [0.85, 1.15, 1.0];
 
@@ -69,22 +58,10 @@ interface FingerChain {
   scale: number;
 }
 
-/** Wrist articulation, in angles that mean the same thing on any model. */
-export interface WristPose {
-  /** Side-to-side rock about the palm normal — the motion of a wave. */
-  wave: number;
-  /** Nodding the hand forward and back about the knuckle line. */
-  nod: number;
-  /** Twist along the length of the hand. */
-  twist: number;
-}
-
 export interface RoboticRig {
   fingers: FingerChain[];
-  /** True when the wrist joint was found and the hand can pivot on it. */
-  hasWrist: boolean;
   /** Applies a pose. `spread` of 1 is neutral; higher opens the hand slightly. */
-  apply(curl: CurlMap, spread: number, wrist: WristPose): void;
+  apply(curl: CurlMap, spread: number): void;
 }
 
 /** GLTFLoader strips dots from node names, so compare on a normalised form. */
@@ -226,69 +203,11 @@ export function buildRoboticRig(model: THREE.Object3D, sign = 1): RoboticRig | n
     chains.push(buildChain('thumb', thumbParts, thumbAxis, model));
   }
 
-  /**
-   * The wrist.
-   *
-   * Without this the whole model — forearm included — rotates about its
-   * bounding-box centre, which is why a wave read as a windscreen wiper rather
-   * than a greeting. Re-parenting the hand onto a pivot at the wrist ball lets
-   * the hand rock while the arm stays put, which is what a real wave looks
-   * like.
-   */
-  const wristBall = parts.get(normalise(WRIST_PART));
-  const handParts = resolve(HAND_PARTS, parts);
-
-  let wristPivot: THREE.Group | null = null;
-  let wristRest = new THREE.Quaternion();
-  const wristAxes = {
-    wave: palmNormal.clone(),
-    nod: knuckleLine.clone(),
-    twist: fingerDirection.clone(),
-  };
-
-  if (wristBall && handParts) {
-    const centre = worldCentre(wristBall);
-
-    wristPivot = new THREE.Group();
-    wristPivot.name = 'rig-wrist';
-    model.add(wristPivot);
-    model.updateMatrixWorld(true);
-    wristPivot.position.copy(model.worldToLocal(centre.clone()));
-    wristPivot.updateMatrixWorld(true);
-
-    // The palm, the thumb's metacarpal and every finger chain ride the wrist.
-    // The forearm parts are deliberately left behind on the model root.
-    for (const part of handParts) wristPivot.attach(part);
-    for (const chain of chains) {
-      const chainRoot = chain.joints[0]?.pivot;
-      if (chainRoot) wristPivot.attach(chainRoot);
-    }
-    wristPivot.updateMatrixWorld(true);
-
-    // Express the three wrist axes in the pivot's own frame.
-    const inverse = new THREE.Matrix4().copy(wristPivot.matrixWorld).invert();
-    wristAxes.wave = palmNormal.clone().transformDirection(inverse).normalize();
-    wristAxes.nod = knuckleLine.clone().transformDirection(inverse).normalize();
-    wristAxes.twist = fingerDirection.clone().transformDirection(inverse).normalize();
-
-    wristRest = wristPivot.quaternion.clone();
-
-    // Joint rest quaternions were captured before the re-parent, but `attach`
-    // preserves world transforms by rewriting local ones — so refresh them.
-    for (const chain of chains) {
-      for (const joint of chain.joints) joint.rest.copy(joint.pivot.quaternion);
-    }
-  }
-
   const quaternion = new THREE.Quaternion();
-  const wristQuat = new THREE.Quaternion();
-  const scratch = new THREE.Quaternion();
 
   return {
     fingers: chains,
-    hasWrist: wristPivot !== null,
-
-    apply(curl: CurlMap, spread: number, wrist: WristPose) {
+    apply(curl: CurlMap, spread: number) {
       // Opening the hand past neutral eases the knuckles slightly straighter.
       const relief = (spread - 1) * 0.12;
 
@@ -300,16 +219,6 @@ export function buildRoboticRig(model: THREE.Object3D, sign = 1): RoboticRig | n
           joint.pivot.quaternion.copy(joint.rest).multiply(quaternion);
         }
       }
-
-      if (!wristPivot) return;
-
-      wristQuat.setFromAxisAngle(wristAxes.wave, wrist.wave);
-      scratch.setFromAxisAngle(wristAxes.nod, wrist.nod);
-      wristQuat.multiply(scratch);
-      scratch.setFromAxisAngle(wristAxes.twist, wrist.twist);
-      wristQuat.multiply(scratch);
-
-      wristPivot.quaternion.copy(wristRest).multiply(wristQuat);
     },
   };
 }

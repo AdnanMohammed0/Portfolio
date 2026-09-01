@@ -7,7 +7,6 @@ import {
   makePose,
   type CurlMap,
   type HandPose,
-  type WristAngles,
 } from './handRig';
 
 export type HandPhase = 'entering' | 'greeting' | 'blending' | 'interactive';
@@ -20,8 +19,8 @@ export interface PointerInput {
   active: boolean;
 }
 
-const ENTER_DURATION = 0.7;
-const GREET_DURATION = 2.1;
+const ENTER_DURATION = 0.55;
+const GREET_DURATION = 1.5;
 const BLEND_DURATION = 0.65;
 
 /** Movement envelope — deliberately narrow so the hand stays elegant. */
@@ -88,7 +87,6 @@ export class HandController {
   /** Rotation the greeting ended on — the seed for interactive mode. */
   private handoffRotation = new THREE.Euler(0, 0, 0);
   private handoffCurl: CurlMap = makeCurlMap(0);
-  private handoffWrist: WristAngles = { wave: 0, nod: 0, twist: 0 };
   private blend = 0;
 
   private idlePhase = Math.random() * Math.PI * 2;
@@ -118,8 +116,6 @@ export class HandController {
   /** Phase of the ripple that runs across the fingers as the pointer moves. */
   private rippleTravel = 0;
 
-  private readonly targetWrist: WristAngles = { wave: 0, nod: 0, twist: 0 };
-
   constructor(private reducedMotion = false) {
     if (reducedMotion) {
       // No entrance, no wave — start settled and interactive.
@@ -129,13 +125,12 @@ export class HandController {
       this.pose.curl = { ...REST_POSE.curl };
       this.pose.rotation.copy(REST_POSE.rotation);
     } else {
-      // Arrives already open. An earlier version rose as a fist and unfurled,
-      // which meant the visitor spent the first half-second looking at a
-      // clenched hand — the opposite of a greeting.
+      // Arrives as a loose fist and unfurls — a hand opening reads as alive in
+      // a way a hand that is simply already open does not.
       this.pose.opacity = 0;
-      this.pose.scale = 0.9;
-      this.pose.curl = makeCurlMap(0.24);
-      this.pose.rotation.set(-0.14, 0.34, 0.12);
+      this.pose.scale = 0.86;
+      this.pose.curl = makeCurlMap(0.85);
+      this.pose.rotation.set(-0.25, 0.55, 0.2);
     }
   }
 
@@ -196,10 +191,11 @@ export class HandController {
       damp(this.pose.rotation.z, 0.04, 6, dt),
     );
 
-    // Fingers relax open as the hand settles into frame.
-    FINGERS.forEach((finger) => {
-      const target = finger === 'thumb' ? 0.2 : 0.1;
-      this.pose.curl[finger] = damp(this.pose.curl[finger], target, 7, dt);
+    // Fingers unfurl in sequence, thumb last, so the opening has a direction.
+    FINGERS.forEach((finger, i) => {
+      const stagger = clamp((t - i * 0.08) / 0.6, 0, 1);
+      const target = 0.85 + (0.06 - 0.85) * easeOutCubic(stagger);
+      this.pose.curl[finger] = damp(this.pose.curl[finger], target, 9, dt);
     });
 
     if (t >= 1) {
@@ -213,94 +209,37 @@ export class HandController {
   private updateGreeting(dt: number): void {
     const t = clamp(this.phaseTime / GREET_DURATION, 0, 1);
 
-    /**
-     * The wave happens at the WRIST, not by rotating the whole arm.
-     *
-     * That single distinction is what separates a greeting from a windscreen
-     * wiper: a person waving holds the forearm nearly still and rocks the hand
-     * on it. Rotating the entire model — forearm included — can never look
-     * human no matter how the curve is shaped.
-     *
-     * On top of that the gesture is built from how people actually move:
-     *   · a wind-up against the first stroke,
-     *   · strokes that accelerate out and ease back rather than sway evenly,
-     *   · the hand pausing a beat at the far end of each stroke,
-     *   · fingers trailing the wrist, each one later than the last,
-     *   · and a decay into stillness instead of an abrupt stop.
-     */
-
-    // Beats: lift (0-0.2), wave (0.2-0.86), settle (0.86-1).
-    const lift = clamp(t / 0.2, 0, 1);
-    const swing = clamp((t - 0.2) / 0.66, 0, 1);
-    const settle = clamp((t - 0.86) / 0.14, 0, 1);
-
-    /**
-     * Stroke shape. `Math.sin` alone gives a pendulum; skewing the phase makes
-     * each stroke leave quickly and arrive slowly, and raising the result to an
-     * odd power flattens the middle so the hand lingers at the extremes — the
-     * beat a real wave has at the top of each swing.
-     */
-    const phase = swing * Math.PI * 3.4;
-    const skewed = phase - Math.sin(phase * 2) * 0.28;
-    const raw = Math.sin(skewed);
-    const stroke = Math.sign(raw) * Math.abs(raw) ** 0.72;
-
-    // Amplitude: grows over the first stroke, decays through the last.
-    const amplitude = easeOutCubic(clamp(swing / 0.22, 0, 1)) * (1 - easeInOutCubic(settle)) * (1 - swing * 0.35);
-
-    // Wind-up: the wrist cocks the other way before the first stroke leaves.
-    const windup = -Math.sin(lift * Math.PI) * 0.38 * (1 - swing);
+    // Envelope keeps the first and last wave softer than the middle ones,
+    // so the gesture starts and ends without a snap.
+    const envelope = Math.sin(Math.PI * t) ** 0.7;
+    // ~2.5 waves across the gesture.
+    const wave = Math.sin(t * Math.PI * 5);
 
     this.pose.opacity = 1;
     this.pose.scale = damp(this.pose.scale, 1, 8, dt);
 
-    // ---- Wrist: the gesture itself -------------------------------------
-    this.pose.wrist.wave = damp(
-      this.pose.wrist.wave,
-      stroke * 1.0 * amplitude + windup,
-      18,
-      dt,
-    );
-    // The hand tips back slightly as it comes up, and nods with each stroke.
-    this.pose.wrist.nod = damp(
-      this.pose.wrist.nod,
-      -0.1 * lift * (1 - settle * 0.6) + Math.abs(stroke) * 0.06 * amplitude,
-      10,
-      dt,
-    );
-    // A touch of twist keeps the palm turned toward the viewer through the arc.
-    this.pose.wrist.twist = damp(this.pose.wrist.twist, -stroke * 0.07 * amplitude, 12, dt);
-
-    // ---- Arm: almost still, just enough to not look bolted down ---------
     this.pose.rotation.set(
-      damp(this.pose.rotation.x, -0.06 - lift * 0.05, 6, dt),
-      damp(this.pose.rotation.y, 0.12 + stroke * 0.1 * amplitude, 7, dt),
-      damp(this.pose.rotation.z, stroke * 0.13 * amplitude, 8, dt),
+      damp(this.pose.rotation.x, -0.08 + wave * 0.05 * envelope, 12, dt),
+      damp(this.pose.rotation.y, 0.12 + wave * 0.1 * envelope, 12, dt),
+      // The roll is the readable part of a wave.
+      damp(this.pose.rotation.z, wave * 0.42 * envelope, 14, dt),
     );
 
-    this.pose.position.set(
-      damp(this.pose.position.x, stroke * 0.12 * amplitude, 9, dt),
-      damp(this.pose.position.y, easeOutCubic(lift) * 0.06, 6, dt),
-      this.pose.position.z,
-    );
+    this.pose.position.set(0, damp(this.pose.position.y, envelope * 0.05, 8, dt), 0);
 
-    // ---- Fingers: trailing the wrist ------------------------------------
-    this.pose.spread = 1 + amplitude * 0.45;
+    // Fingers ripple across the wave, each one lagging the last, the way real
+    // fingers trail when a hand rocks side to side.
+    this.pose.spread = 1 + envelope * 0.5;
     FINGERS.forEach((finger, i) => {
-      // Each finger arrives later than the one before it. The lag is what
-      // stops the hand reading as a single rigid paddle.
-      const trail = Math.sin(skewed - i * 0.62) * 0.1 * amplitude;
-      // The hand stays open throughout — a wave is an open hand rocking, not a
-      // hand opening. The fingers only trail the wrist by a small amount.
-      const base = finger === 'thumb' ? 0.2 : 0.1;
-      this.pose.curl[finger] = damp(this.pose.curl[finger], clamp(base + trail, 0, 1), 14, dt);
+      const ripple = Math.sin(t * Math.PI * 5 - i * 0.55) * 0.16 * envelope;
+      const open = 0.1 + ripple;
+      this.pose.curl[finger] = damp(this.pose.curl[finger], clamp(open, 0, 1), 12, dt);
     });
 
     if (t >= 1) {
       // Capture the exact pose the wave finished on: tracking starts here.
       this.handoffRotation.copy(this.pose.rotation);
       this.handoffCurl = { ...this.pose.curl };
-      this.handoffWrist = { ...this.pose.wrist };
       this.phase = 'blending';
       this.phaseTime = 0;
       this.blend = 0;
@@ -336,15 +275,6 @@ export class HandController {
       this.springs.posZ.step(this.targetPosition.z, dt),
     );
 
-    /**
-     * Tracking is split between wrist and arm. The wrist takes most of the
-     * movement and reacts faster, so the hand turns toward the pointer and the
-     * arm follows a beat later — the same lead-and-follow a real limb has.
-     */
-    this.pose.wrist.wave = damp(this.pose.wrist.wave, this.targetWrist.wave, 6, dt);
-    this.pose.wrist.nod = damp(this.pose.wrist.nod, this.targetWrist.nod, 5.5, dt);
-    this.pose.wrist.twist = damp(this.pose.wrist.twist, this.targetWrist.twist, 5, dt);
-
     const curlLambda = 7;
     for (const finger of FINGERS) {
       this.pose.curl[finger] = damp(this.pose.curl[finger], this.targetCurl[finger], curlLambda, dt);
@@ -362,9 +292,6 @@ export class HandController {
         this.pose.curl[finger] +=
           (this.handoffCurl[finger] - this.pose.curl[finger]) * back;
       }
-      this.pose.wrist.wave += (this.handoffWrist.wave - this.pose.wrist.wave) * back;
-      this.pose.wrist.nod += (this.handoffWrist.nod - this.pose.wrist.nod) * back;
-      this.pose.wrist.twist += (this.handoffWrist.twist - this.pose.wrist.twist) * back;
     }
   }
 
@@ -422,13 +349,6 @@ export class HandController {
       // Slight depth parallax as the pointer approaches the centre.
       (1 - Math.hypot(x, y)) * LIMITS.offsetZ * 0.35 * engaged,
     );
-
-    // The wrist carries most of the reach, plus a slow idle sway so the hand is
-    // never perfectly still.
-    const sway = Math.sin(t * 0.5 + this.idlePhase) * 0.05 * idle;
-    this.targetWrist.wave = x * 0.42 * strength * engaged + sway + bank * 0.6;
-    this.targetWrist.nod = -y * 0.3 * strength * engaged - 0.08;
-    this.targetWrist.twist = x * 0.12 * strength * engaged;
 
     /**
      * Idle life. Two layers: a continuous per-finger breath, and a slow flex

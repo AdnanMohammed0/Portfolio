@@ -86,22 +86,9 @@ export function InteractiveHand({ trackingTargetRef, className, useTilt = false 
     return () => observer.disconnect();
   }, []);
 
-  /**
-   * Pause rendering when the tab is hidden.
-   *
-   * `?nopause=1` disables this in development only — some embedded browsers
-   * report `document.hidden` permanently, which otherwise makes the hand
-   * impossible to observe while working on it.
-   */
+  // Pause rendering when the tab is hidden.
   useEffect(() => {
-    const ignoreHidden =
-      import.meta.env.DEV && new URLSearchParams(window.location.search).has('nopause');
-    if (ignoreHidden) {
-      setSceneActive(true);
-      return;
-    }
     const onVisibility = () => setSceneActive(!document.hidden);
-    onVisibility();
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
