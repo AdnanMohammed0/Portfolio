@@ -87,17 +87,29 @@ supabase functions deploy notify-telegram --no-verify-jwt
 
 ### 6. Create the database webhook
 
-In the dashboard: **Database → Webhooks → Create a new hook**
+Run `supabase/webhook.sql` in the SQL editor, after uncommenting the
+`vault.create_secret` line and setting it to the same value you gave
+`WEBHOOK_SECRET`.
 
-| Field | Value |
+Use the SQL rather than hunting for the screen: Supabase has moved this between
+**Database → Webhooks** and **Integrations → Database Webhooks** across
+versions, and a dashboard webhook is only a trigger calling `pg_net` anyway —
+which is exactly what the script creates.
+
+Check what actually went out:
+
+```sql
+select id, created, status_code, content
+from net._http_response order by created desc limit 5;
+```
+
+| `status_code` | Meaning |
 | --- | --- |
-| Name | `notify-telegram` |
-| Table | `public.messages` |
-| Events | `Insert` only |
-| Type | HTTP Request |
-| Method | `POST` |
-| URL | `https://glehfecoemqhodwkxpbm.supabase.co/functions/v1/notify-telegram` |
-| HTTP Headers | `x-webhook-secret` = the same value you set above |
+| `200` | Delivered |
+| `401` | The secret in Vault does not match `WEBHOOK_SECRET` |
+| `404` | The function is not deployed |
+| `500` | Missing credentials, or Telegram refused — check the function logs |
+| no rows | The trigger never fired |
 
 ### 7. Test
 

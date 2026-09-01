@@ -121,7 +121,7 @@ src/
   services/         Content providers (Supabase + local) behind one interface
   lib/              Supabase client, utilities
   types/            Shared domain types
-supabase/           schema.sql, seed.sql
+supabase/           schema.sql, seed.sql, integrations.sql, webhook.sql
   functions/        notify-telegram Edge Function
 public/assets/hand/ The hand model
 ```
