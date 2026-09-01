@@ -71,19 +71,17 @@ is captured and interpolated into pointer tracking, so there is no jump.
 - **Desktop** — the hand follows the pointer with damped, spring-like motion,
   normalised against the hero rather than the window so it stays composed at
   screen edges.
-- **Mobile** — the hero is re-composed rather than shrunk, and an **Enable AR**
-  button offers optional hand tracking.
-- **AR** — on mobile, hand tracking **starts automatically** once the hero is on
-  screen (`autoStartAr` in `Hero.tsx`); it is never auto-started on desktop.
-  The browser still shows its own camera permission prompt — no site can skip
-  that — so this moves the prompt to page load rather than removing it. Camera
-  and MediaPipe are dynamically imported and only fetched when AR actually
-  starts. `Exit AR` releases the stream, the tracker and the animation loop.
-  Denial or an unsupported device shows a message, offers `Retry AR`, and leaves
-  the normal 3D hand running.
+- **Mobile** — the hero is re-composed rather than shrunk, and the hand follows
+  **how the phone is tilted**, via `DeviceOrientationEvent`. Tilt is normalised
+  to the same `[-1, 1]` range the mouse produces, so it feeds the identical code
+  path and inherits the springs, banking and finger ripple.
 
-  To go back to tap-to-start (the more privacy-conservative default), drop the
-  `autoStartAr` prop in `src/sections/Hero.tsx`.
+  There is **no camera and no permission prompt** on Android — the hand simply
+  responds to the device. iOS gates motion access behind a user gesture, so
+  there a single "Move with my phone" button appears; everywhere else nothing is
+  shown. The first reading becomes the neutral position, so the hand is centred
+  however the visitor happens to be holding the phone, and the neutral point
+  drifts slowly to follow a change of posture.
 - **Reduced motion** — the entrance and wave are skipped and tracking is damped
   down; the site stays fully usable.
 
@@ -92,8 +90,7 @@ parts at load time. See `public/assets/hand/README.md` for how to replace the
 model.
 
 Nothing about the 3D system is in the initial bundle: three.js loads on demand,
-rendering pauses when the hero scrolls away or the tab is hidden, and MediaPipe
-is only fetched if AR is switched on.
+and rendering pauses when the hero scrolls away or the tab is hidden.
 
 ---
 
@@ -126,22 +123,13 @@ through it, so they can never disagree about what the content is.
 ## Testing on a phone
 
 `npm run dev` binds to the local network, so the site is reachable at
-`http://<your-ip>:5183`. That is enough for everything except AR.
+`http://<your-ip>:5183` — no certificate needed. The hand's tilt control uses
+`DeviceOrientationEvent`, which plain HTTP serves fine on Android.
 
-AR calls `getUserMedia`, which browsers only allow in a **secure context**:
-
-| How you open it | AR works? |
-| --- | --- |
-| `http://localhost:5183` | Yes — localhost is always treated as secure |
-| `http://192.168.x.x:5183` | No — plain HTTP on a LAN address is not secure |
-| `npm run dev:https` → `https://192.168.x.x:5183` | Android Chrome yes, after accepting the certificate warning. **iOS Safari no** — it refuses the camera behind an untrusted certificate |
-| `npm run tunnel` → `https://….loca.lt` | Yes, everywhere — the certificate is genuine |
-
-So for iPhone testing, run `npm run dev` in one terminal and `npm run tunnel`
-in another, and open the tunnel URL.
-
-When AR cannot start, the hero says why rather than failing silently, and the
-normal 3D hand keeps running either way.
+iOS restricts motion access to secure origins, so for iPhone testing run
+`npm run dev` in one terminal and `npm run tunnel` in another, and open the
+`https://….loca.lt` URL it prints. `npm run dev:https` is also available, but a
+self-signed certificate is not enough for iOS.
 
 ## Scripts
 

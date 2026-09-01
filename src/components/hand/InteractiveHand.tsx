@@ -10,11 +10,11 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from 'react';
-import { Camera, CameraOff, Loader2 } from 'lucide-react';
+import { Smartphone } from 'lucide-react';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cx } from '@/lib/utils';
-import { HandController, type ARInput, type PointerInput } from './handController';
-import type { ARHandController, ARStatus } from './arController';
+import { HandController, type PointerInput } from './handController';
+import { TiltController, type TiltStatus } from './tiltController';
 import { HandFallback } from './HandFallback';
 
 /** three.js and the whole scene stay out of the initial bundle. */
@@ -24,10 +24,11 @@ interface Props {
   /** Element the pointer is measured against — normally the hero. */
   trackingTargetRef: React.RefObject<HTMLElement>;
   className?: string;
-  /** Renders the AR toggle. Enabled on the mobile hero only. */
-  showArButton?: boolean;
-  /** Start AR as soon as the hero is visible, without waiting for a tap. */
-  autoStartAr?: boolean;
+  /**
+   * Drive the hand from the device's orientation sensor instead of a pointer.
+   * Enabled on touch devices, where there is no cursor to follow.
+   */
+  useTilt?: boolean;
 }
 
 function supportsWebGL(): boolean {
@@ -42,25 +43,17 @@ function supportsWebGL(): boolean {
   }
 }
 
-export function InteractiveHand({
-  trackingTargetRef,
-  className,
-  showArButton = false,
-  autoStartAr = false,
-}: Props) {
+export function InteractiveHand({ trackingTargetRef, className, useTilt = false }: Props) {
   const reducedMotion = useReducedMotion();
 
   const [mounted, setMounted] = useState(false);
   const [webglOk, setWebglOk] = useState<boolean | null>(null);
   const [failed, setFailed] = useState(false);
-
-  const [arStatus, setArStatus] = useState<ARStatus>('idle');
-  const [arMessage, setArMessage] = useState<string | null>(null);
-  const arControllerRef = useRef<ARHandController | null>(null);
+  const [tiltStatus, setTiltStatus] = useState<TiltStatus>('idle');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pointerRef = useRef<PointerInput>({ x: 0, y: 0, active: false });
-  const arRef = useRef<ARInput | null>(null);
+  const tiltRef = useRef<TiltController | null>(null);
 
   const controller = useMemo(() => new HandController(reducedMotion), [reducedMotion]);
   const [sceneActive, setSceneActive] = useState(true);
@@ -103,6 +96,7 @@ export function InteractiveHand({
   // Pointer tracking, normalised against the hero rather than the window so the
   // hand stays elegant at the edges of the screen.
   useEffect(() => {
+    if (useTilt) return;
     const target = trackingTargetRef.current;
     if (!target) return;
 
@@ -129,63 +123,51 @@ export function InteractiveHand({
       target.removeEventListener('pointerleave', onLeave);
       window.removeEventListener('blur', onLeave);
     };
-  }, [trackingTargetRef]);
+  }, [trackingTargetRef, useTilt]);
 
-  const stopAr = useCallback(async () => {
-    const ar = arControllerRef.current;
-    if (!ar) return;
-    await ar.stop();
-    arRef.current = null;
-    arControllerRef.current = null;
-    setArStatus('idle');
-    setArMessage(null);
-  }, []);
-
-  const startAr = useCallback(async () => {
-    if (arControllerRef.current) return;
-    setArMessage(null);
-    setArStatus('starting');
-    try {
-      const { ARHandController: Controller } = await import('./arController');
-      const ar = new Controller((status, message) => {
-        setArStatus(status);
-        if (message) setArMessage(message);
-      });
-      arControllerRef.current = ar;
-      arRef.current = ar.input;
-      await ar.start();
-      if (ar.status === 'unavailable' || ar.status === 'denied') {
-        arRef.current = null;
-        arControllerRef.current = null;
-      }
-    } catch {
-      arRef.current = null;
-      arControllerRef.current = null;
-      setArStatus('unavailable');
-      setArMessage('AR interaction is unavailable on this device.');
-    }
+  const startTilt = useCallback(async () => {
+    if (tiltRef.current) return;
+    const tilt = new TiltController(setTiltStatus);
+    tiltRef.current = tilt;
+    await tilt.start();
   }, []);
 
   /**
-   * Mobile: start AR without waiting for a tap.
-   *
-   * The browser still shows its own camera permission prompt — no site can skip
-   * that — so this moves the prompt to load time rather than removing it. It
-   * waits until the hero is actually on screen, runs once, and stays silent if
-   * permission is refused: the normal 3D hand simply keeps running.
+   * Device orientation drives the hand on touch devices. Android exposes the
+   * sensor without any permission, so this starts on its own. iOS gates it
+   * behind a user gesture, which surfaces as a single small button.
    */
-  const autoStarted = useRef(false);
   useEffect(() => {
-    if (!autoStartAr || autoStarted.current) return;
-    if (!mounted || !sceneActive || reducedMotion) return;
-    autoStarted.current = true;
-    void startAr();
-  }, [autoStartAr, mounted, sceneActive, reducedMotion, startAr]);
+    if (!useTilt || reducedMotion || !mounted) return;
+    if (TiltController.needsPermission) {
+      setTiltStatus('needs-permission');
+      return;
+    }
+    void startTilt();
+    return () => {
+      tiltRef.current?.stop();
+      tiltRef.current = null;
+    };
+  }, [useTilt, reducedMotion, mounted, startTilt]);
 
-  // Always release the camera when the hand unmounts.
-  useEffect(() => () => void arControllerRef.current?.stop(), []);
+  // Feed the sensor into the same normalised input the mouse writes to, so the
+  // springs, banking and finger ripple all apply unchanged.
+  useEffect(() => {
+    if (!useTilt) return;
+    let raf = 0;
+    const pump = () => {
+      raf = requestAnimationFrame(pump);
+      const tilt = tiltRef.current;
+      if (!tilt || tilt.status !== 'active') return;
+      pointerRef.current.x = tilt.reading.x;
+      pointerRef.current.y = tilt.reading.y;
+      pointerRef.current.active = true;
+    };
+    raf = requestAnimationFrame(pump);
+    return () => cancelAnimationFrame(raf);
+  }, [useTilt]);
 
-  const arOn = arStatus === 'tracking' || arStatus === 'searching' || arStatus === 'starting';
+  useEffect(() => () => tiltRef.current?.stop(), []);
 
   return (
     <div ref={containerRef} className={cx('relative', className)}>
@@ -196,7 +178,7 @@ export function InteractiveHand({
       {/* ---- Hand ----
           Masked so the wrist dissolves into the page instead of ending on a
           hard cut. The mask is on the wrapper, not the canvas, so it survives
-          the fallback and the AR states too. */}
+          the fallback states too. */}
       <div
         className="relative h-full w-full"
         style={{
@@ -215,7 +197,6 @@ export function InteractiveHand({
                 <HandScene
                   controller={controller}
                   pointerRef={pointerRef}
-                  arRef={arRef}
                   active={sceneActive}
                   reducedMotion={reducedMotion}
                 />
@@ -225,38 +206,18 @@ export function InteractiveHand({
         )}
       </div>
 
-      {showArButton && (
-        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2">
+      {/* iOS only: motion access needs a tap. Everywhere else the hand simply
+          responds to the phone, with nothing to press and nothing to grant. */}
+      {useTilt && tiltStatus === 'needs-permission' && (
+        <div className="absolute inset-x-0 bottom-0 flex justify-center">
           <button
             type="button"
-            onClick={() => (arOn ? void stopAr() : void startAr())}
-            disabled={arStatus === 'unavailable'}
-            aria-describedby="ar-hint"
-            className={cx(
-              'liquid-glass btn rounded-full px-5 py-2.5 text-xs uppercase tracking-[0.18em]',
-              'text-white/85 disabled:cursor-not-allowed disabled:opacity-40',
-            )}
+            onClick={() => void startTilt()}
+            className="liquid-glass btn rounded-full px-5 py-2.5 text-xs uppercase tracking-[0.18em] text-white/85"
           >
-            {arStatus === 'starting' ? (
-              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-            ) : arOn ? (
-              <CameraOff size={14} aria-hidden="true" />
-            ) : (
-              <Camera size={14} aria-hidden="true" />
-            )}
-            {arOn ? 'Exit AR' : autoStartAr ? 'Retry AR' : 'Enable AR'}
+            <Smartphone size={14} aria-hidden="true" />
+            Move with my phone
           </button>
-
-          <p id="ar-hint" className="max-w-[16rem] text-center text-[11px] leading-relaxed text-white/35">
-            {arMessage ??
-              (arStatus === 'tracking'
-                ? 'Tracking your hand.'
-                : arStatus === 'searching'
-                  ? 'Hold your hand up to the camera.'
-                  : arStatus === 'starting'
-                    ? 'Starting the camera…'
-                    : 'Uses your camera to mirror your real hand. Nothing is uploaded.')}
-          </p>
         </div>
       )}
     </div>

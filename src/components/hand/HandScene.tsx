@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Float } from '@react-three/drei';
 import { HandModel } from './HandModel';
-import { HandController, type ARInput, type PointerInput } from './handController';
+import { HandController, type PointerInput } from './handController';
 import type { HandPose } from './handRig';
 
 /**
@@ -14,13 +14,12 @@ import type { HandPose } from './handRig';
 interface SceneProps {
   controller: HandController;
   pointerRef: React.MutableRefObject<PointerInput>;
-  arRef: React.MutableRefObject<ARInput | null>;
   active: boolean;
   reducedMotion: boolean;
   onPhaseChange?: (phase: string) => void;
 }
 
-function HandRig({ controller, pointerRef, arRef, reducedMotion, onPhaseChange }: SceneProps) {
+function HandRig({ controller, pointerRef, reducedMotion, onPhaseChange }: SceneProps) {
   const poseRef = useRef<HandPose>(controller.pose);
   const lastPhase = useRef(controller.phase);
   const { invalidate } = useThree();
@@ -46,7 +45,7 @@ function HandRig({ controller, pointerRef, arRef, reducedMotion, onPhaseChange }
   useEffect(() => () => material.dispose(), [material]);
 
   useFrame((_state, delta) => {
-    controller.update(delta, pointerRef.current, arRef.current);
+    controller.update(delta, pointerRef.current);
     material.opacity = controller.pose.opacity;
     material.transparent = controller.pose.opacity < 0.999;
 

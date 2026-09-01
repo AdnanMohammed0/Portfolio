@@ -10,13 +10,13 @@ import { useIsCompact, useIsTouchDevice } from '@/hooks/useMediaQuery';
  *
  * Desktop: copy left, hand right, occupying roughly 45% of the hero.
  * Mobile: the layout is re-composed rather than shrunk — copy, then CTA, then
- * the hand beneath it with the AR toggle, so nothing overlaps the text.
+ * the hand beneath it, so nothing overlaps the text.
  */
 export function Hero() {
   const heroRef = useRef<HTMLElement>(null);
   const { hero } = useSiteContent();
   const compact = useIsCompact();
-  // AR is offered on touch hardware, which is not the same thing as a narrow window.
+  // Tilt control is for touch hardware, which is not the same thing as a narrow window.
   const touch = useIsTouchDevice();
 
   const jump = (href: string) => {
@@ -75,15 +75,14 @@ export function Hero() {
           </div>
 
           {/* ---- Hand ----
-              One canvas for every breakpoint. On mobile it drops below the copy
-              and gains the AR toggle; on desktop it takes the right half and
-              tracks the pointer. Mounting two canvases would mean two WebGL
-              contexts for one visible hand. */}
+              One canvas for every breakpoint. On desktop it takes the right
+              half and follows the pointer; on touch devices it drops below the
+              copy and follows how the phone is tilted. Mounting two canvases
+              would mean two WebGL contexts for one visible hand. */}
           <div className="order-2 lg:col-span-6 xl:col-span-6">
             <InteractiveHand
               trackingTargetRef={heroRef}
-              showArButton={touch}
-              autoStartAr={touch}
+              useTilt={touch}
               className={
                 compact
                   ? 'relative mx-auto block h-[48vh] max-h-[440px] w-full max-w-sm pb-16'

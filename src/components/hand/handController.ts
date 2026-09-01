@@ -19,19 +19,8 @@ export interface PointerInput {
   active: boolean;
 }
 
-export interface ARInput {
-  active: boolean;
-  x: number;
-  y: number;
-  z: number;
-  pitch: number;
-  yaw: number;
-  roll: number;
-  curl: CurlMap;
-}
-
-const ENTER_DURATION = 0.55;
-const GREET_DURATION = 1.5;
+const ENTER_DURATION = 0.7;
+const GREET_DURATION = 2.1;
 const BLEND_DURATION = 0.65;
 
 /** Movement envelope — deliberately narrow so the hand stays elegant. */
@@ -78,7 +67,11 @@ class Spring {
 /**
  * Owns the hand's whole lifecycle:
  *
- *   LOAD → HELLO / WAVE → SMOOTH TRANSITION → MOUSE (or AR) INTERACTION
+ *   LOAD → HELLO / WAVE → SMOOTH TRANSITION → INTERACTION
+ *
+ * Interaction is pointer-driven on desktop and device-orientation-driven on
+ * phones; both arrive through the same normalised PointerInput, so everything
+ * downstream — springs, banking, finger ripple — is shared.
  *
  * The greeting never hard-stops: its final rotation is captured and used as the
  * starting point of tracking, then interpolated away, so there is no visual jump.
@@ -162,7 +155,7 @@ export class HandController {
     return this.phase === 'interactive' || this.phase === 'blending';
   }
 
-  update(dt: number, pointer: PointerInput, ar: ARInput | null): void {
+  update(dt: number, pointer: PointerInput): void {
     // Guard against huge steps after a tab has been backgrounded.
     const step = Math.min(dt, 1 / 20);
     this.elapsed += step;
@@ -177,7 +170,7 @@ export class HandController {
         break;
       case 'blending':
       case 'interactive':
-        this.updateInteractive(step, pointer, ar);
+        this.updateInteractive(step, pointer);
         break;
     }
   }
@@ -216,31 +209,67 @@ export class HandController {
   private updateGreeting(dt: number): void {
     const t = clamp(this.phaseTime / GREET_DURATION, 0, 1);
 
-    // Envelope keeps the first and last wave softer than the middle ones,
-    // so the gesture starts and ends without a snap.
-    const envelope = Math.sin(Math.PI * t) ** 0.7;
-    // ~2.5 waves across the gesture.
-    const wave = Math.sin(t * Math.PI * 5);
+    /**
+     * A real wave is not a sine curve.
+     *
+     * Three things separate a human wave from an oscillating object:
+     *
+     *  1. **Anticipation.** The hand swings slightly the wrong way before the
+     *     first real stroke, the way a person winds up.
+     *  2. **Asymmetric strokes.** The outward stroke is quicker than the
+     *     return, so the motion has a pulse instead of a metronome beat.
+     *  3. **Follow-through.** The wrist leads and the fingers arrive late,
+     *     and the last stroke overshoots and settles rather than stopping.
+     */
+
+    // Wind-up occupies the first 18%, waving the remainder.
+    const windup = clamp(t / 0.18, 0, 1);
+    const swing = clamp((t - 0.18) / 0.82, 0, 1);
+
+    // Envelope: rises fast, falls slowly, so the gesture decays like a real one.
+    const envelope = swing < 0.15 ? easeOutCubic(swing / 0.15) : (1 - (swing - 0.15) / 0.85) ** 1.6;
+
+    /**
+     * Asymmetric oscillation: `skew` bends the phase so each stroke accelerates
+     * out and eases back. 2.5 strokes over the gesture.
+     */
+    const phase = swing * Math.PI * 5;
+    const skewed = phase - Math.sin(phase * 2) * 0.22;
+    const wave = Math.sin(skewed);
+
+    // The wind-up rolls the hand slightly away from the first stroke.
+    const anticipation = -Math.sin(windup * Math.PI) * 0.18 * (1 - swing);
 
     this.pose.opacity = 1;
     this.pose.scale = damp(this.pose.scale, 1, 8, dt);
 
     this.pose.rotation.set(
-      damp(this.pose.rotation.x, -0.08 + wave * 0.05 * envelope, 12, dt),
-      damp(this.pose.rotation.y, 0.12 + wave * 0.1 * envelope, 12, dt),
-      // The roll is the readable part of a wave.
-      damp(this.pose.rotation.z, wave * 0.42 * envelope, 14, dt),
+      // A wave lifts the hand a little as it goes; the tilt tracks the stroke.
+      damp(this.pose.rotation.x, -0.1 + Math.abs(wave) * 0.09 * envelope, 11, dt),
+      // Counter-rotation: the palm turns slightly into each stroke.
+      damp(this.pose.rotation.y, 0.12 - wave * 0.16 * envelope, 10, dt),
+      // Roll is the readable part of a wave.
+      damp(this.pose.rotation.z, wave * 0.46 * envelope + anticipation, 16, dt),
     );
 
-    this.pose.position.set(0, damp(this.pose.position.y, envelope * 0.05, 8, dt), 0);
+    // The whole hand sways with the stroke rather than pivoting in place, and
+    // rises on the first beat like an arm coming up.
+    this.pose.position.set(
+      damp(this.pose.position.x, wave * 0.07 * envelope, 10, dt),
+      damp(this.pose.position.y, envelope * 0.07 + Math.sin(windup * Math.PI) * 0.03, 7, dt),
+      this.pose.position.z,
+    );
 
-    // Fingers ripple across the wave, each one lagging the last, the way real
-    // fingers trail when a hand rocks side to side.
-    this.pose.spread = 1 + envelope * 0.5;
+    // Fingers splay open through the wave and trail behind the wrist. The
+    // per-finger lag is what stops the hand reading as one rigid paddle.
+    this.pose.spread = 1 + envelope * 0.55;
     FINGERS.forEach((finger, i) => {
-      const ripple = Math.sin(t * Math.PI * 5 - i * 0.55) * 0.16 * envelope;
-      const open = 0.1 + ripple;
-      this.pose.curl[finger] = damp(this.pose.curl[finger], clamp(open, 0, 1), 12, dt);
+      const lag = i * 0.75;
+      const trail = Math.sin(skewed - lag) * 0.19 * envelope;
+      // The thumb stays a little more closed than the fingers, as it does
+      // when a person waves with an open palm.
+      const base = finger === 'thumb' ? 0.2 : 0.07;
+      this.pose.curl[finger] = damp(this.pose.curl[finger], clamp(base + trail, 0, 1), 13, dt);
     });
 
     if (t >= 1) {
@@ -255,7 +284,7 @@ export class HandController {
 
   // -- INTERACTION ---------------------------------------------------------
 
-  private updateInteractive(dt: number, pointer: PointerInput, ar: ARInput | null): void {
+  private updateInteractive(dt: number, pointer: PointerInput): void {
     if (this.phase === 'blending') {
       this.blend = clamp(this.blend + dt / BLEND_DURATION, 0, 1);
       if (this.blend >= 1) {
@@ -267,47 +296,26 @@ export class HandController {
     this.pose.opacity = damp(this.pose.opacity, 1, 8, dt);
     this.pose.scale = damp(this.pose.scale, 1, 8, dt);
 
-    if (ar?.active) {
-      this.computeArTargets(ar);
-    } else {
-      this.computePointerTargets(pointer, dt);
-    }
+    this.computePointerTargets(pointer, dt);
 
-    if (ar?.active) {
-      // AR is already smoothed upstream and must stay locked to the real hand,
-      // so it damps directly rather than going through the springs.
-      const lambda = 9;
-      this.pose.rotation.set(
-        damp(this.pose.rotation.x, this.targetRotation.x, lambda, dt),
-        damp(this.pose.rotation.y, this.targetRotation.y, lambda, dt),
-        damp(this.pose.rotation.z, this.targetRotation.z, lambda, dt),
-      );
-      this.pose.position.set(
-        damp(this.pose.position.x, this.targetPosition.x, lambda, dt),
-        damp(this.pose.position.y, this.targetPosition.y, lambda, dt),
-        damp(this.pose.position.z, this.targetPosition.z, lambda, dt),
-      );
-      this.syncSpringsToPose();
-    } else {
-      // Pointer tracking rides the springs, so the hand carries momentum and
-      // settles rather than easing to a stop.
-      this.pose.rotation.set(
-        this.springs.rotX.step(this.targetRotation.x, dt),
-        this.springs.rotY.step(this.targetRotation.y, dt),
-        this.springs.rotZ.step(this.targetRotation.z, dt),
-      );
-      this.pose.position.set(
-        this.springs.posX.step(this.targetPosition.x, dt),
-        this.springs.posY.step(this.targetPosition.y, dt),
-        this.springs.posZ.step(this.targetPosition.z, dt),
-      );
-    }
+    // Pointer tracking rides the springs, so the hand carries momentum and
+    // settles rather than easing to a stop.
+    this.pose.rotation.set(
+      this.springs.rotX.step(this.targetRotation.x, dt),
+      this.springs.rotY.step(this.targetRotation.y, dt),
+      this.springs.rotZ.step(this.targetRotation.z, dt),
+    );
+    this.pose.position.set(
+      this.springs.posX.step(this.targetPosition.x, dt),
+      this.springs.posY.step(this.targetPosition.y, dt),
+      this.springs.posZ.step(this.targetPosition.z, dt),
+    );
 
-    const curlLambda = ar?.active ? 12 : 7;
+    const curlLambda = 7;
     for (const finger of FINGERS) {
       this.pose.curl[finger] = damp(this.pose.curl[finger], this.targetCurl[finger], curlLambda, dt);
     }
-    this.pose.spread = damp(this.pose.spread, ar?.active ? 1.15 : 1, 4, dt);
+    this.pose.spread = damp(this.pose.spread, 1, 4, dt);
 
     // While blending, pull back toward the pose the wave ended on so the
     // transition into tracking has no discontinuity.
@@ -323,15 +331,6 @@ export class HandController {
     }
   }
 
-  /** Keeps the springs in step with a pose that was driven by AR instead. */
-  private syncSpringsToPose(): void {
-    this.springs.rotX.set(this.pose.rotation.x);
-    this.springs.rotY.set(this.pose.rotation.y);
-    this.springs.rotZ.set(this.pose.rotation.z);
-    this.springs.posX.set(this.pose.position.x);
-    this.springs.posY.set(this.pose.position.y);
-    this.springs.posZ.set(this.pose.position.z);
-  }
 
   private computePointerTargets(pointer: PointerInput, dt: number): void {
     const strength = this.reducedMotion ? 0.25 : 1;
@@ -433,21 +432,6 @@ export class HandController {
     });
   }
 
-  private computeArTargets(ar: ARInput): void {
-    this.targetRotation.set(
-      clamp(ar.pitch, -LIMITS.pitch * 2.2, LIMITS.pitch * 2.2),
-      clamp(ar.yaw, -LIMITS.yaw * 2, LIMITS.yaw * 2),
-      clamp(ar.roll, -0.9, 0.9),
-    );
-    this.targetPosition.set(
-      clamp(ar.x, -1, 1) * LIMITS.offsetX * 2.4,
-      clamp(ar.y, -1, 1) * LIMITS.offsetY * 2.4,
-      clamp(ar.z, -1, 1) * LIMITS.offsetZ,
-    );
-    for (const finger of FINGERS) {
-      this.targetCurl[finger] = clamp(ar.curl[finger], 0, 1);
-    }
-  }
 }
 
 function easeOutCubic(t: number): number {
