@@ -111,6 +111,23 @@ export interface PortfolioData {
   experience: Experience[];
 }
 
+/**
+ * Credentials for outbound integrations.
+ *
+ * Kept apart from SiteContent on purpose: SiteContent is publicly readable, and
+ * these values are not. They are only ever fetched by a signed-in administrator
+ * or by the Edge Function server-side.
+ */
+export interface TelegramSettings {
+  enabled: boolean;
+  bot_token: string;
+  chat_id: string;
+}
+
+export interface IntegrationSettings {
+  telegram: TelegramSettings;
+}
+
 export interface ContactMessage {
   id: string;
   name: string;

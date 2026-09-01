@@ -1,5 +1,6 @@
 import type {
   ContactMessage,
+  IntegrationSettings,
   Experience,
   MediaItem,
   PortfolioData,
@@ -13,6 +14,7 @@ import type {
 import { slugify, uid } from '@/lib/utils';
 import {
   DEFAULT_CONTENT,
+  DEFAULT_INTEGRATIONS,
   DEFAULT_EXPERIENCE,
   DEFAULT_PROJECTS,
   DEFAULT_SKILLS,
@@ -37,6 +39,7 @@ interface LocalStore {
   experience: Experience[];
   media: MediaItem[];
   messages: ContactMessage[];
+  integrations: IntegrationSettings;
 }
 
 function seed(): LocalStore {
@@ -47,6 +50,7 @@ function seed(): LocalStore {
     experience: structuredClone(DEFAULT_EXPERIENCE),
     media: [],
     messages: [],
+    integrations: structuredClone(DEFAULT_INTEGRATIONS),
   };
 }
 
@@ -238,6 +242,17 @@ export const localProvider: ContentProvider = {
     const store = read();
     if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
     store.media = store.media.filter((m) => m.id !== item.id);
+    write(store);
+    await delay(null);
+  },
+
+  async getIntegrationSettings() {
+    return delay(read().integrations);
+  },
+
+  async saveIntegrationSettings(value) {
+    const store = read();
+    store.integrations = value;
     write(store);
     await delay(null);
   },

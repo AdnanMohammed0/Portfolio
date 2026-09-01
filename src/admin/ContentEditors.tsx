@@ -8,6 +8,7 @@ import type {
   MediaItem,
   SettingsContent,
   SiteContent,
+  TelegramSettings,
   SiteContentKey,
   Skill,
 } from '@/types';
@@ -15,7 +16,18 @@ import { content } from '@/services/content';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { Skeleton } from '@/components/primitives';
 import { reorder, uid } from '@/lib/utils';
-import { Button, Field, IconButton, Panel, SaveBar, TextArea, TextInput, useSave } from './ui';
+import {
+  Button,
+  Field,
+  IconButton,
+  Notice,
+  Panel,
+  SaveBar,
+  TextArea,
+  TextInput,
+  Toggle,
+  useSave,
+} from './ui';
 import { MediaPicker } from './MediaPicker';
 
 function PageHeader({ eyebrow, title, hint }: { eyebrow: string; title: string; hint?: string }) {
@@ -412,6 +424,8 @@ export function SettingsEditor() {
 
       <SaveBar state={state} error={error} onSave={() => void save()} />
 
+      <TelegramPanel />
+
       <MediaPicker
         open={picker !== null}
         title={picker === 'og' ? 'Select an Open Graph image' : 'Select a favicon'}
@@ -422,6 +436,114 @@ export function SettingsEditor() {
         }}
       />
     </div>
+  );
+}
+
+/* --------------------------------------------------- Telegram integration */
+
+/**
+ * Credentials live in `integration_settings`, not `site_content`.
+ *
+ * `site_content` is publicly readable — the public site has to fetch the hero
+ * copy from it — so a bot token stored there would be readable by any visitor
+ * through the REST API. `integration_settings` has no anon policy at all: only
+ * a signed-in administrator can read or write it, and the Edge Function reads
+ * it server-side.
+ */
+function TelegramPanel() {
+  const { state, error, run } = useSave();
+  const [draft, setDraft] = useState<TelegramSettings | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reveal, setReveal] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    content
+      .getIntegrationSettings()
+      .then((value) => active && setDraft(value.telegram))
+      .catch((cause: unknown) =>
+        active ? setLoadError(cause instanceof Error ? cause.message : 'Failed to load') : undefined,
+      );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (loadError) {
+    return (
+      <Panel title="Telegram notifications">
+        <p className="text-sm text-red-300/80">{loadError}</p>
+      </Panel>
+    );
+  }
+
+  if (!draft) {
+    return (
+      <Panel title="Telegram notifications">
+        <Skeleton className="h-32 w-full" />
+      </Panel>
+    );
+  }
+
+  const set = <K extends keyof TelegramSettings>(key: K, value: TelegramSettings[K]) =>
+    setDraft((current) => (current ? { ...current, [key]: value } : current));
+
+  const save = () => run(() => content.saveIntegrationSettings({ telegram: draft }));
+
+  return (
+    <Panel
+      title="Telegram notifications"
+      description="Forward contact-form messages to a Telegram bot."
+    >
+      <div className="space-y-4">
+        <Notice tone="info">
+          These values are stored in a table only administrators can read, and are
+          never sent to the public site. Messages are saved to the database first,
+          so a delivery failure never loses one.
+        </Notice>
+
+        <Toggle
+          label="Send notifications"
+          hint="Turn off to keep the credentials but stop delivery"
+          checked={draft.enabled}
+          onChange={(v) => set('enabled', v)}
+        />
+
+        <Field
+          label="Bot token"
+          id="tg-token"
+          hint="From @BotFather. Revoke and replace it if it is ever exposed."
+        >
+          <div className="flex gap-2">
+            <TextInput
+              id="tg-token"
+              type={reveal ? 'text' : 'password'}
+              value={draft.bot_token}
+              onChange={(v) => set('bot_token', v.trim())}
+              placeholder="123456789:AA…"
+            />
+            <Button variant="ghost" onClick={() => setReveal((v) => !v)}>
+              {reveal ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+        </Field>
+
+        <Field
+          label="Chat ID"
+          id="tg-chat"
+          hint="Message the bot once, then read result[0].message.chat.id from /getUpdates."
+        >
+          <TextInput
+            id="tg-chat"
+            value={draft.chat_id}
+            onChange={(v) => set('chat_id', v.trim())}
+            placeholder="7747273064"
+          />
+        </Field>
+
+        <SaveBar state={state} error={error} onSave={() => void save()} />
+      </div>
+    </Panel>
   );
 }
 

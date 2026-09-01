@@ -34,17 +34,40 @@ supabase login
 supabase link --project-ref glehfecoemqhodwkxpbm
 ```
 
-### 2. Set the secrets
+### 2. Create the settings table
 
-Never commit these. `supabase secrets set` stores them server-side.
+Run `supabase/integrations.sql` in the SQL editor. It creates
+`integration_settings`, which holds the bot token and chat id.
+
+That table is deliberately separate from `site_content`. `site_content` carries
+a public read policy — the public site reads the hero copy from it — so
+anything stored there is readable by any visitor through the REST API.
+`integration_settings` has no anon policy at all: only a signed-in
+administrator can read or write it.
+
+Confirm that yourself with the anon key:
 
 ```bash
-supabase secrets set TELEGRAM_BOT_TOKEN=<token from @BotFather>
+curl "https://<project>.supabase.co/rest/v1/integration_settings?select=*" -H "apikey: <anon key>"
 ```
 
+It must return `[]`, never the token.
+
+### 3. Enter the credentials in the dashboard
+
+**/admin → Settings → Telegram notifications**
+
+Paste the bot token and your chat id, switch **Send notifications** on, and
+save.
+
+Function secrets still work as a fallback if you would rather not store them in
+the database:
+
 ```bash
-supabase secrets set TELEGRAM_CHAT_ID=<your numeric chat id>
+supabase secrets set TELEGRAM_BOT_TOKEN=<token> TELEGRAM_CHAT_ID=<chat id>
 ```
+
+### 4. Set the webhook secret
 
 ```bash
 supabase secrets set WEBHOOK_SECRET=<any long random string you invent>
@@ -53,7 +76,7 @@ supabase secrets set WEBHOOK_SECRET=<any long random string you invent>
 `WEBHOOK_SECRET` matters: the function URL is public, so without it anyone who
 finds the URL could POST to it and push messages through your bot.
 
-### 3. Deploy the function
+### 5. Deploy the function
 
 `--no-verify-jwt` is required because the caller is a database webhook, not a
 signed-in user. The `WEBHOOK_SECRET` header is what authenticates it instead.
@@ -62,7 +85,7 @@ signed-in user. The `WEBHOOK_SECRET` header is what authenticates it instead.
 supabase functions deploy notify-telegram --no-verify-jwt
 ```
 
-### 4. Create the database webhook
+### 6. Create the database webhook
 
 In the dashboard: **Database → Webhooks → Create a new hook**
 
@@ -76,7 +99,7 @@ In the dashboard: **Database → Webhooks → Create a new hook**
 | URL | `https://glehfecoemqhodwkxpbm.supabase.co/functions/v1/notify-telegram` |
 | HTTP Headers | `x-webhook-secret` = the same value you set above |
 
-### 5. Test
+### 7. Test
 
 Submit the contact form on the site, or insert a row directly:
 

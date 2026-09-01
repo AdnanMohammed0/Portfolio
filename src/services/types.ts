@@ -1,5 +1,6 @@
 import type {
   ContactMessage,
+  IntegrationSettings,
   Experience,
   MediaItem,
   PortfolioData,
@@ -45,6 +46,13 @@ export interface ContentProvider {
   listMedia(): Promise<MediaItem[]>;
   uploadMedia(file: File): Promise<MediaItem>;
   deleteMedia(item: MediaItem): Promise<void>;
+
+  /**
+   * Admin-only. Reading these requires an authenticated administrator; the
+   * database rejects the request for anyone else.
+   */
+  getIntegrationSettings(): Promise<IntegrationSettings>;
+  saveIntegrationSettings(value: IntegrationSettings): Promise<void>;
 
   submitMessage(input: { name: string; email: string; message: string }): Promise<void>;
   listMessages(): Promise<ContactMessage[]>;

@@ -9,9 +9,11 @@
  * visitor — the token has to live here, as a Supabase secret, and never reach
  * the browser.
  *
- * Secrets required (set with `supabase secrets set`):
- *   TELEGRAM_BOT_TOKEN   from @BotFather
- *   TELEGRAM_CHAT_ID     the chat to deliver to
+ * Credentials are read from `public.integration_settings`, which the dashboard
+ * edits and only administrators can access. `TELEGRAM_BOT_TOKEN` and
+ * `TELEGRAM_CHAT_ID` function secrets still work as a fallback.
+ *
+ * Required secret:
  *   WEBHOOK_SECRET       shared value the database webhook sends back
  */
 
@@ -27,6 +29,43 @@ interface WebhookPayload {
   type: 'INSERT' | 'UPDATE' | 'DELETE';
   table: string;
   record: ContactMessage | null;
+}
+
+interface TelegramSettings {
+  enabled: boolean;
+  bot_token: string;
+  chat_id: string;
+}
+
+/**
+ * Reads the credentials an administrator saved in the dashboard.
+ *
+ * Returns null when the table is missing or unreadable, so the function still
+ * works from function secrets alone.
+ */
+async function loadTelegramSettings(): Promise<TelegramSettings | null> {
+  const url = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !serviceKey) return null;
+
+  try {
+    const response = await fetch(
+      `${url}/rest/v1/integration_settings?key=eq.telegram&select=value`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+    );
+    if (!response.ok) return null;
+    const rows = (await response.json()) as Array<{ value: Partial<TelegramSettings> }>;
+    const value = rows[0]?.value;
+    if (!value) return null;
+    return {
+      enabled: value.enabled ?? true,
+      bot_token: (value.bot_token ?? '').trim(),
+      chat_id: (value.chat_id ?? '').trim(),
+    };
+  } catch (cause) {
+    console.error('Could not read integration_settings:', cause);
+    return null;
+  }
 }
 
 /** Telegram's HTML mode needs these escaped or the message fails to send. */
@@ -46,12 +85,25 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID');
   const webhookSecret = Deno.env.get('WEBHOOK_SECRET');
 
+  /**
+   * Credentials come from the dashboard first, falling back to function
+   * secrets. Reading them needs the service-role key, which Supabase injects
+   * into the function environment — `integration_settings` is closed to
+   * everyone except administrators and this function.
+   */
+  const settings = await loadTelegramSettings();
+
+  const botToken = settings?.bot_token || Deno.env.get('TELEGRAM_BOT_TOKEN');
+  const chatId = settings?.chat_id || Deno.env.get('TELEGRAM_CHAT_ID');
+
+  if (settings && settings.enabled === false) {
+    return new Response('Notifications disabled', { status: 200 });
+  }
+
   if (!botToken || !chatId) {
-    console.error('TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set');
+    console.error('No Telegram bot token or chat id configured');
     return new Response('Not configured', { status: 500 });
   }
 

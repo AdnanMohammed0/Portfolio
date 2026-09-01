@@ -1,4 +1,10 @@
-import type { Experience, Project, SiteContent, Skill } from '@/types';
+import type {
+  Experience,
+  IntegrationSettings,
+  Project,
+  SiteContent,
+  Skill,
+} from '@/types';
 
 export const DEFAULT_CONTENT: SiteContent = {
   hero: {
@@ -182,3 +188,7 @@ export const DEFAULT_EXPERIENCE: Experience[] = [
     sort_order: 2,
   },
 ];
+
+export const DEFAULT_INTEGRATIONS: IntegrationSettings = {
+  telegram: { enabled: false, bot_token: '', chat_id: '' },
+};

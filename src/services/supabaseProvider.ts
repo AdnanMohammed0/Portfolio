@@ -1,5 +1,6 @@
 import type {
   ContactMessage,
+  IntegrationSettings,
   Experience,
   MediaItem,
   PortfolioData,
@@ -12,7 +13,7 @@ import type {
 } from '@/types';
 import { MEDIA_BUCKET, requireSupabase } from '@/lib/supabase';
 import { slugify, uid } from '@/lib/utils';
-import { DEFAULT_CONTENT } from './defaults';
+import { DEFAULT_CONTENT, DEFAULT_INTEGRATIONS } from './defaults';
 import type { ContentProvider } from './types';
 
 const PROJECT_COLUMNS =
@@ -281,6 +282,31 @@ export const supabaseProvider: ContentProvider = {
     fail('Failed to remove file', storageError);
     const { error } = await db.from('media').delete().eq('id', item.id);
     fail('Failed to remove media record', error);
+  },
+
+  async getIntegrationSettings() {
+    const db = requireSupabase();
+    const { data, error } = await db.from('integration_settings').select('key,value');
+    // RLS returns nothing to non-admins rather than erroring, so an empty
+    // result simply yields the blank defaults.
+    fail('Failed to load integration settings', error);
+
+    const merged = structuredClone(DEFAULT_INTEGRATIONS);
+    for (const row of (data ?? []) as Array<{ key: string; value: unknown }>) {
+      if (row.key === 'telegram' && row.value && typeof row.value === 'object') {
+        Object.assign(merged.telegram, row.value as object);
+      }
+    }
+    return merged;
+  },
+
+  async saveIntegrationSettings(value: IntegrationSettings) {
+    const db = requireSupabase();
+    const { error } = await db.from('integration_settings').upsert(
+      { key: 'telegram', value: value.telegram, updated_at: new Date().toISOString() },
+      { onConflict: 'key' },
+    );
+    fail('Failed to save integration settings', error);
   },
 
   async submitMessage(input) {
