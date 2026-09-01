@@ -94,6 +94,20 @@ and rendering pauses when the hero scrolls away or the tab is hidden.
 
 ---
 
+## Contact notifications
+
+Contact-form submissions are saved to `public.messages` and forwarded to
+Telegram by a Supabase Edge Function, triggered by a database webhook on insert.
+
+The bot token lives as a Supabase secret, never in the frontend — anything this
+app holds is readable by every visitor. Setup steps are in
+`supabase/functions/README.md`.
+
+Delivery is decoupled on purpose: the message is stored before the webhook
+fires, so a Telegram outage costs a notification, never the message.
+
+---
+
 ## Project structure
 
 ```
@@ -108,6 +122,7 @@ src/
   lib/              Supabase client, utilities
   types/            Shared domain types
 supabase/           schema.sql, seed.sql
+  functions/        notify-telegram Edge Function
 public/assets/hand/ The hand model
 ```
 
