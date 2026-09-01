@@ -88,9 +88,20 @@ export function makeCurlMap(value = 0): CurlMap {
   return { thumb: value, index: value, middle: value, ring: value, pinky: value };
 }
 
+/** Wrist articulation. The hand rocks on this; the arm barely moves. */
+export interface WristAngles {
+  /** Side-to-side rock about the palm normal — the motion of a wave. */
+  wave: number;
+  /** Nodding forward and back about the knuckle line. */
+  nod: number;
+  /** Twist along the length of the hand. */
+  twist: number;
+}
+
 /** The complete pose the renderer reads each frame. */
 export interface HandPose {
   curl: CurlMap;
+  wrist: WristAngles;
   /** Finger splay multiplier — fingers open outward as it rises. */
   spread: number;
   rotation: THREE.Euler;
@@ -102,6 +113,7 @@ export interface HandPose {
 export function makePose(): HandPose {
   return {
     curl: makeCurlMap(0.05),
+    wrist: { wave: 0, nod: 0, twist: 0 },
     spread: 1,
     rotation: new THREE.Euler(0, 0, 0),
     position: new THREE.Vector3(0, 0, 0),

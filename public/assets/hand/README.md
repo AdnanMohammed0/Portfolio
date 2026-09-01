@@ -25,9 +25,18 @@ The part names are read from the model:
 | Pinky  | `Cylinder.017` `Cube.035` `Cylinder.015` `Cube.036` `Cylinder.016` `Cube.037` |
 | Thumb  | `Cylinder.004` `Cube.018` `Cylinder.005` `Cube.019`                       |
 
-Hinge axes are measured from the geometry (the knuckle line across the hand),
-not hard-coded, so the rig survives a re-export that changes the model's
-orientation.
+Plus a **wrist** joint. `Sphere.008` is the wrist ball; the palm (`Cube.025`),
+the thumb's metacarpal (`Cube.017`) and every finger chain are re-parented onto
+a pivot at its centre. Everything else — `Cube.014`, `Cylinder`,
+`Cylinder.001`, `Cylinder.018`, `Cylinder.002` — is forearm and stays behind.
+
+That split is what makes the greeting read as a wave rather than a windscreen
+wiper: a person waving keeps the forearm nearly still and rocks the hand on the
+wrist. Rotating the whole model cannot look human however the curve is shaped.
+
+Hinge axes are measured from the geometry (the knuckle line across the hand,
+and the palm normal derived from it), not hard-coded, so the rig survives a
+re-export that changes the model's orientation.
 
 ## Replacing the model
 
@@ -42,6 +51,8 @@ Two dev-only URL parameters help when aiming a new model:
 
 - `?handrot=x,y,z` — override the model orientation, in radians.
 - `?curl=0.85` — freeze every finger at a fixed curl to check the joints.
+- `?nopause=1` — keep rendering even when the browser reports the page hidden,
+  for embedded browsers that always report `document.hidden`.
 
 Tune `MODEL_ORIENTATION`, `TARGET_HEIGHT` and `CURL_SIGN` in `HandModel.tsx`
 once the values look right.
