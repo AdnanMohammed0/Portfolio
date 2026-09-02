@@ -15,7 +15,7 @@ import { trackClick } from '@/services/analytics';
  */
 export function Hero() {
   const heroRef = useRef<HTMLElement>(null);
-  const { hero, contact } = useSiteContent();
+  const { hero, contact, settings } = useSiteContent();
   const compact = useIsCompact();
   // Tilt control is for touch hardware, which is not the same thing as a narrow window.
   const touch = useIsTouchDevice();
@@ -64,7 +64,14 @@ export function Hero() {
           <div className="order-1 lg:col-span-6 xl:col-span-6">
             <p className="label-xs animate-fade">{hero.label}</p>
 
+            {/* The page's one h1 names the person as well as the pitch.
+                A search for the owner's name should land here, and the h1 is
+                the strongest on-page signal of what a page is about — but the
+                headline is the design, so the name is read out rather than
+                shown. Screen readers announce it; it is the real subject of
+                the page, not hidden keyword stuffing. */}
             <h1 className="mt-6 text-balance text-[clamp(2.6rem,7.4vw,5.4rem)] font-medium leading-[0.98] tracking-tightest">
+              <span className="sr-only">{settings.site_name} — </span>
               {hero.heading}
             </h1>
 

@@ -6,6 +6,7 @@ import { Container, LiquidGlass, Skeleton } from '@/components/primitives';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { Seo } from '@/components/Seo';
+import { ProjectSchema } from '@/components/StructuredData';
 import { content } from '@/services/content';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { isVideo } from '@/lib/utils';
@@ -69,6 +70,7 @@ export default function ProjectDetailPage() {
 
   return (
     <>
+      {project && <ProjectSchema project={project} content={data.content} />}
       {project && (
         <Seo
           type="article"

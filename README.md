@@ -94,6 +94,32 @@ and rendering pauses when the hero scrolls away or the tab is hidden.
 
 ---
 
+## SEO
+
+Meta tags describe a page; structured data describes the *thing* it is about.
+`StructuredData.tsx` emits JSON-LD — a `Person` record on the home page and a
+`CreativeWork` plus breadcrumbs on each project — so a search engine can connect
+the site to an identity rather than treating the owner's name as two ordinary
+words.
+
+`sameAs` carries the profile links, and it is the field that does the work: each
+entry claims the same person owns that profile, and search engines corroborate
+it against the link back. Empty and placeholder URLs are filtered out, because
+an unverifiable claim weakens the record rather than strengthening it.
+
+The `h1` names the person as well as the pitch. The headline is the design, so
+the name is announced rather than displayed — it is the real subject of the
+page, read out by screen readers, not hidden keyword stuffing.
+
+Everything else — title, description, Open Graph image, canonical URL — is
+editable from **Settings**, and `sitemap.xml` is generated at build time.
+
+What the code cannot do is earn the ranking. For a name query that comes from
+links pointing at the site from profiles that already rank: GitHub, LinkedIn,
+anywhere the same name appears. Add the URL to those profiles.
+
+---
+
 ## Analytics
 
 First-party, stored in your own database. No third-party script, no cookie, no

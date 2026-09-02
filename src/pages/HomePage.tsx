@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { Favicon, Seo } from '@/components/Seo';
+import { PersonSchema } from '@/components/StructuredData';
 import { Hero } from '@/sections/Hero';
 import { AboutSection } from '@/sections/AboutSection';
 import { WorksSection } from '@/sections/WorksSection';
@@ -34,6 +35,7 @@ export default function HomePage() {
         path="/"
       />
       <Favicon href={settings.favicon} />
+      <PersonSchema content={data.content} />
 
       <a
         href="#main"
