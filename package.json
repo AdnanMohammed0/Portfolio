@@ -7,9 +7,10 @@
     "dev": "vite",
     "dev:https": "node scripts/dev-https.mjs",
     "tunnel": "node scripts/tunnel.mjs",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/generate-sitemap.mjs",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "sitemap": "node scripts/generate-sitemap.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",

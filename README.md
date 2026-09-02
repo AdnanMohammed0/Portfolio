@@ -185,6 +185,16 @@ VITE_SUPABASE_ANON_KEY=<anon / publishable key>
 Only ever the anon key. The service-role key must never reach the browser — it
 bypasses row-level security entirely.
 
+**`SITE_URL`** must also be set, to your canonical origin (`https://…`, no
+trailing slash). The build uses it to write `sitemap.xml` and `robots.txt`.
+Without it neither file is produced — a sitemap full of the wrong origin is
+worse for search than no sitemap, so the script refuses to guess.
+
+The sitemap is generated on every build rather than committed, because project
+pages come from the database: publishing or unpublishing a project in the
+dashboard changes which URLs should be listed, so a hand-written file would go
+stale immediately. Redeploy to refresh it.
+
 **SPA rewrites** are already configured: `/work/:slug` and `/admin/*` are
 client-side routes, so every path has to fall back to `index.html`. Without
 this, those URLs 404 on refresh or when opened directly.
