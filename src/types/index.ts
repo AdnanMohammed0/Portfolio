@@ -86,6 +86,12 @@ export interface ContactContent {
 
 export interface SettingsContent {
   site_name: string;
+  /**
+   * Other spellings of the owner's name, comma separated — Arabic, a shorter
+   * form, a maiden name. Emitted as schema.org `alternateName` so a search in
+   * any of them resolves to the same person.
+   */
+  alt_names: string;
   logo_text: string;
   seo_title: string;
   seo_description: string;

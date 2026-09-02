@@ -37,9 +37,10 @@ insert into public.site_content (key, value) values
   'location',  'Remote / Worldwide'
 )),
 ('settings', jsonb_build_object(
-  'site_name',        'Adnan Mohammed',
+  'site_name',        'Adnan Mohammed Adnan',
+  'alt_names',        'Adnan Mohammed Alzubaidy, Adnan Mohammed, Adnan M. Adnan, عدنان محمد عدنان, عدنان محمد الزبيدي, عدنان محمد',
   'logo_text',        'Adnan Mohammed',
-  'seo_title',        'Adnan Mohammed — AI Engineer & Developer',
+  'seo_title',        'Adnan Mohammed Adnan — AI Engineer & Developer',
   'seo_description',  'I design and develop AI-powered products, interactive experiences, and modern digital systems.',
   'og_image',         null,
   'favicon',          null,

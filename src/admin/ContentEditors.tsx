@@ -335,6 +335,18 @@ export function SettingsEditor() {
           <Field label="Logo text" id="s-logo" hint="Shown in the navigation and footer.">
             <TextInput id="s-logo" value={settings.logo_text} onChange={(v) => set('logo_text', v)} />
           </Field>
+          <Field
+            label="Other spellings of your name"
+            id="s-alt"
+            hint="Comma separated — Arabic, a shorter form. Not shown on the site; it tells search engines these all refer to you."
+          >
+            <TextInput
+              id="s-alt"
+              value={settings.alt_names ?? ''}
+              onChange={(v) => set('alt_names', v)}
+              placeholder="عدنان محمد, Adnan M. Adnan"
+            />
+          </Field>
           <Field label="Footer copyright" id="s-copy">
             <TextInput
               id="s-copy"

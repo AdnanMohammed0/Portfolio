@@ -52,10 +52,21 @@ export function PersonSchema({ content }: { content: SiteContent }) {
     .filter((value): value is string => Boolean(value) && /^https?:\/\/.+\..+/.test(value ?? ''))
     .filter((value) => !/^https?:\/\/(github|linkedin|instagram)\.com\/?$/i.test(value));
 
+  /**
+   * Every other spelling of the name. A search engine treats these as the same
+   * entity, so an Arabic search and an English one land on the same person
+   * rather than competing.
+   */
+  const alternateName = (settings.alt_names ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0 && value !== settings.site_name);
+
   const person = {
     '@type': 'Person',
     '@id': `${url}/#person`,
     name: settings.site_name,
+    ...(alternateName.length > 0 ? { alternateName } : {}),
     url,
     jobTitle: 'AI Engineer & Developer',
     description: about.short_bio,
