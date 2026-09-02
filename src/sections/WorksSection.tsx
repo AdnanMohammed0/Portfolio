@@ -10,6 +10,7 @@ import {
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useReveal } from '@/hooks/useReveal';
 import { cx } from '@/lib/utils';
+import { trackClick } from '@/services/analytics';
 import { ProjectCard, type TileSize } from './ProjectCard';
 
 const ALL = 'All';
@@ -73,7 +74,10 @@ export function WorksSection() {
                     role="tab"
                     type="button"
                     aria-selected={filter === category}
-                    onClick={() => setFilter(category)}
+                    onClick={() => {
+                      trackClick('filter_change', category);
+                      setFilter(category);
+                    }}
                     className={cx(
                       'shrink-0 rounded-full px-4 py-2 text-[12px] transition-colors duration-300',
                       filter === category

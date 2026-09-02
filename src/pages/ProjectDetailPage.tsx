@@ -9,6 +9,7 @@ import { Seo } from '@/components/Seo';
 import { content } from '@/services/content';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { isVideo } from '@/lib/utils';
+import { trackClick } from '@/services/analytics';
 
 export default function ProjectDetailPage() {
   const { slug = '' } = useParams();
@@ -117,6 +118,7 @@ export default function ProjectDetailPage() {
                           href={project.project_url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => trackClick('outbound_click', `${project.slug} — site`)}
                           className="btn btn-primary"
                         >
                           Visit project
@@ -128,6 +130,7 @@ export default function ProjectDetailPage() {
                           href={project.github_url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => trackClick('outbound_click', `${project.slug} — github`)}
                           className="btn btn-ghost liquid-glass"
                         >
                           <Github size={15} aria-hidden="true" />

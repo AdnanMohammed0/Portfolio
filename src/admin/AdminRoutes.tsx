@@ -4,6 +4,7 @@ import { AdminLayout } from './AdminLayout';
 import { RequireAdmin } from './RequireAdmin';
 import { LoginPage } from './LoginPage';
 import { DashboardHome } from './DashboardHome';
+import { AnalyticsPage } from './AnalyticsPage';
 import { ProjectManager } from './ProjectManager';
 import { ProjectEditor } from './ProjectEditor';
 import { MediaManager } from './MediaManager';
@@ -44,6 +45,7 @@ export default function AdminRoutes() {
         }
       >
         <Route index element={<DashboardHome />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="projects" element={<ProjectManager />} />
         <Route path="projects/:id" element={<ProjectEditor />} />
         <Route path="media" element={<MediaManager />} />

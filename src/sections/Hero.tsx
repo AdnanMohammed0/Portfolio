@@ -4,6 +4,7 @@ import { Container } from '@/components/primitives';
 import { InteractiveHand } from '@/components/hand/InteractiveHand';
 import { useSiteContent } from '@/hooks/usePortfolio';
 import { useIsCompact, useIsTouchDevice } from '@/hooks/useMediaQuery';
+import { trackClick } from '@/services/analytics';
 
 /**
  * The hero. The interactive hand lives inside it — never as its own section.
@@ -72,7 +73,10 @@ export function Hero() {
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => jump(hero.primary_cta_url)}
+                onClick={() => {
+                  trackClick('cta_click', hero.primary_cta_text);
+                  jump(hero.primary_cta_url);
+                }}
                 className="btn btn-primary"
               >
                 {hero.primary_cta_text}
@@ -80,7 +84,10 @@ export function Hero() {
               </button>
               <button
                 type="button"
-                onClick={() => jump(hero.secondary_cta_url)}
+                onClick={() => {
+                  trackClick('cta_click', hero.secondary_cta_text);
+                  jump(hero.secondary_cta_url);
+                }}
                 className="btn btn-ghost liquid-glass"
               >
                 {hero.secondary_cta_text}
@@ -104,6 +111,7 @@ export function Hero() {
                           rel={external ? 'noopener noreferrer' : undefined}
                           aria-label={label}
                           title={label}
+                          onClick={() => trackClick('social_click', label)}
                           className="liquid-glass flex h-11 w-11 items-center justify-center rounded-full text-white/55 transition-all duration-300 hover:-translate-y-0.5 hover:text-white"
                         >
                           <Icon size={16} aria-hidden="true" />

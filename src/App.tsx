@@ -5,10 +5,17 @@ import { AuthProvider } from '@/hooks/useAuth';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
 import { Spinner } from '@/components/primitives';
 import HomePage from '@/pages/HomePage';
+import { usePageViews } from '@/hooks/usePageViews';
 
 // The public detail page and the entire admin bundle load on demand.
 const ProjectDetailPage = lazy(() => import('@/pages/ProjectDetailPage'));
 const AdminRoutes = lazy(() => import('@/admin/AdminRoutes'));
+
+/** Must sit inside the router, since it reads the current location. */
+function RouteTracker() {
+  usePageViews();
+  return null;
+}
 
 function RouteFallback() {
   return (
@@ -24,6 +31,7 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <PortfolioProvider>
+            <RouteTracker />
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<HomePage />} />

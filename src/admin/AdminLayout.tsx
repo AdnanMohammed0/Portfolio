@@ -4,6 +4,7 @@ import {
   Briefcase,
   ExternalLink,
   Image,
+  BarChart3,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -21,6 +22,7 @@ import { Notice } from './ui';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/admin/projects', label: 'Projects', icon: Briefcase },
   { to: '/admin/media', label: 'Media', icon: Image },
   { to: '/admin/hero', label: 'Hero', icon: Sparkles },

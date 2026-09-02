@@ -10,6 +10,7 @@ import {
 import { useSiteContent } from '@/hooks/usePortfolio';
 import { useReveal } from '@/hooks/useReveal';
 import { content } from '@/services/content';
+import { track, trackClick } from '@/services/analytics';
 
 type Status = 'idle' | 'sending' | 'sent' | 'error';
 
@@ -36,6 +37,7 @@ export function ContactSection() {
     setError(null);
     try {
       await content.submitMessage(form);
+      void track('contact_submit');
       setStatus('sent');
       setForm({ name: '', email: '', message: '' });
     } catch (cause) {
@@ -195,6 +197,7 @@ export function ContactSection() {
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => trackClick('social_click', label)}
                         className="group flex items-center justify-between gap-3 rounded-xl px-1 py-1.5 text-sm text-white/75 transition-colors hover:text-white"
                       >
                         <span className="flex items-center gap-3">

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 import type { Project } from '@/types';
 import { cx, isVideo } from '@/lib/utils';
+import { trackClick } from '@/services/analytics';
 
 /**
  * Bento tile for one project.
@@ -79,6 +80,7 @@ export function ProjectCard({ project, size, index }: Props) {
       <Link
         to={`/work/${project.slug}`}
         aria-label={`${project.title} — view project`}
+        onClick={() => trackClick('project_open', project.slug)}
         className="block h-full focus-visible:outline-none"
       >
         <div

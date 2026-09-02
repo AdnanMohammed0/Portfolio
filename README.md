@@ -94,6 +94,26 @@ and rendering pauses when the hero scrolls away or the tab is hidden.
 
 ---
 
+## Analytics
+
+First-party, stored in your own database. No third-party script, no cookie, no
+cross-site identifier. `/admin/analytics` shows page views, visitors, clicks,
+top pages and projects, referrers and devices.
+
+Run `supabase/analytics.sql` once to create the table and the summary function.
+
+The session id is random per tab and lives in `sessionStorage`, so it is gone
+when the tab closes. It exists to tell "one person viewing five pages" apart
+from "five people", not to follow anyone between visits.
+
+Visitors can insert events and nothing else — there is deliberately no `select`
+policy for `anon`, so traffic, referrers and sessions cannot be read back from
+the browser. Aggregation happens in Postgres via `analytics_summary()`, which
+checks `is_admin()` itself because `SECURITY DEFINER` bypasses row-level
+security. Dashboard routes are never recorded.
+
+---
+
 ## Contact notifications
 
 Contact-form submissions are saved to `public.messages` and forwarded to
